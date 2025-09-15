@@ -110,28 +110,84 @@ export const ModernHeroSection: React.FC<ModernHeroSectionProps> = ({
 }) => {
   const navigate = useNavigate();
   const [isPlaying, setIsPlaying] = useState(false);
+  const [audioError, setAudioError] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
-  const handlePlayAudio = () => {
-    if (audioRef.current) {
-      if (isPlaying) {
-        audioRef.current.pause();
-        setIsPlaying(false);
-      } else {
-        // Select audio source based on variant and location
-        const audioSrc = (variant === 'sales' || (variant === 'summary' && location === 'Kwality House'))
-          ? '/kwality-house-audio.mp3' 
-          : '/placeholder-audio.mp3';
-        
-        audioRef.current.src = audioSrc;
-        audioRef.current.play();
+
+  const handlePlayAudio = async () => {
+    if (!audioRef.current) return;
+
+    if (isPlaying) {
+      audioRef.current.pause();
+      setIsPlaying(false);
+      return;
+    }
+
+    try {
+      setAudioError(null);
+      
+      // Select audio source based on variant and location
+      const audioSrc = (variant === 'sales' || (variant === 'summary' && location === 'Kwality House'))
+        ? '/kwality-house-audio.mp3' 
+        : '/placeholder-audio.mp3';
+      
+      console.log('Attempting to play audio:', audioSrc);
+      console.log('Current audio element:', audioRef.current);
+      
+      // Set the source
+      audioRef.current.src = audioSrc;
+      
+      // Reset the audio element
+      audioRef.current.load();
+      
+      // Set volume to ensure it's audible
+      audioRef.current.volume = 0.8;
+      
+      // Try to play
+      const playPromise = audioRef.current.play();
+      
+      if (playPromise !== undefined) {
+        await playPromise;
         setIsPlaying(true);
+        console.log('Audio started playing successfully');
       }
+    } catch (error: any) {
+      console.error('Failed to play audio:', error);
+      let errorMessage = 'Failed to play audio.';
+      
+      if (error.name === 'NotAllowedError') {
+        errorMessage = 'Audio playback was blocked by browser. Please enable autoplay or try again.';
+      } else if (error.name === 'NotSupportedError') {
+        errorMessage = 'Audio format not supported by your browser.';
+      } else if (error.name === 'AbortError') {
+        errorMessage = 'Audio playback was aborted.';
+      }
+      
+      setAudioError(errorMessage);
+      setTimeout(() => setAudioError(null), 5000); // Clear error after 5 seconds
     }
   };
   return <div className={`relative min-h-[588px] overflow-hidden bg-gradient-to-br ${gradientVariants[variant]} text-white`}>
       {/* Hidden audio element */}
-      <audio ref={audioRef} onEnded={() => setIsPlaying(false)} preload="metadata">
-        {/* Dynamic audio source will be set by handlePlayAudio */}
+      <audio 
+        ref={audioRef} 
+        onEnded={() => {
+          console.log('Audio ended');
+          setIsPlaying(false);
+        }}
+        onError={(e) => {
+          console.error('Audio element error:', e);
+          setAudioError('Audio file could not be loaded');
+          setIsPlaying(false);
+        }}
+        onLoadStart={() => console.log('Audio load started')}
+        onCanPlay={() => console.log('Audio can play')}
+        onPlay={() => console.log('Audio play event')}
+        onPause={() => console.log('Audio pause event')}
+        preload="metadata"
+        controls={false}
+      >
+        {/* Multiple source formats for better compatibility */}
+        <source src="/kwality-house-audio.mp3" type="audio/mpeg" />
         <source src="/placeholder-audio.mp3" type="audio/mpeg" />
         Your browser does not support the audio element.
       </audio>
@@ -149,17 +205,33 @@ export const ModernHeroSection: React.FC<ModernHeroSectionProps> = ({
           </Button>}
       </div>
       
-      <div className="absolute top-6 right-6 z-20 flex gap-3">
-        {/* Audio Play Button */}
-        <Button variant="ghost" size="sm" onClick={handlePlayAudio} className="text-white/90 hover:text-white hover:bg-white/20 backdrop-blur-sm border border-white/20 transition-all duration-300 hover:scale-105">
-          {isPlaying ? <Pause className="w-4 h-4 mr-2" /> : <Play className="w-4 h-4 mr-2" />}
-          {isPlaying ? 'Pause' : 'Play'}
-        </Button>
+      <div className="absolute top-6 right-6 z-20 flex flex-col gap-3">
+        <div className="flex gap-3">
+          {/* Audio Play Button */}
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={handlePlayAudio} 
+            className={`text-white/90 hover:text-white hover:bg-white/20 backdrop-blur-sm border transition-all duration-300 hover:scale-105 ${
+              audioError ? 'border-red-400/50 bg-red-500/10' : 'border-white/20'
+            }`}
+          >
+            {isPlaying ? <Pause className="w-4 h-4 mr-2" /> : <Play className="w-4 h-4 mr-2" />}
+            {isPlaying ? 'Pause' : 'Play'}
+          </Button>
+          
+          {exportButton || onExport && <Button variant="ghost" size="sm" onClick={onExport} className="text-white/90 hover:text-white bg-transparent hover:bg-white/20 backdrop-blur-sm border border-white/20 transition-all duration-300 hover:scale-105">
+              <Download className="w-4 h-4 mr-2" />
+              Export
+            </Button>}
+        </div>
         
-        {exportButton || onExport && <Button variant="ghost" size="sm" onClick={onExport} className="text-white/90 hover:text-white bg-transparent hover:bg-white/20 backdrop-blur-sm border border-white/20 transition-all duration-300 hover:scale-105">
-            <Download className="w-4 h-4 mr-2" />
-            Export
-          </Button>}
+        {/* Error message */}
+        {audioError && (
+          <div className="bg-red-500/20 text-white text-xs px-3 py-2 rounded-lg backdrop-blur-sm border border-red-400/30 max-w-xs">
+            {audioError}
+          </div>
+        )}
       </div>
       
       {/* Content */}
