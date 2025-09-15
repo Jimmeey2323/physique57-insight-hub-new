@@ -10,7 +10,9 @@ export default defineConfig(({ mode }) => ({
     port: 8080,
   },
   plugins: [
-    react(),
+    react({
+      jsxImportSource: 'react'
+    }),
     mode === 'development' &&
     componentTagger(),
   ].filter(Boolean),
@@ -25,6 +27,10 @@ export default defineConfig(({ mode }) => ({
     cssCodeSplit: true,
     assetsInlineLimit: 0,
     rollupOptions: {
+      external: (id) => {
+        // Don't externalize any dependencies - bundle them all
+        return false;
+      },
       output: {
         manualChunks: (id) => {
           if (id.includes('node_modules')) {
@@ -122,6 +128,7 @@ export default defineConfig(({ mode }) => ({
       '@radix-ui/react-popover',
       '@tanstack/react-query'
     ],
+    exclude: [],
     force: true,
   },
   esbuild: {
