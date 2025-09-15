@@ -34,12 +34,6 @@ export default defineConfig(({ mode }) => ({
       output: {
         manualChunks: (id) => {
           if (id.includes('node_modules')) {
-            if (id.includes('react') || id.includes('react-dom') || id.includes('react-router')) {
-              return 'react-vendor';
-            }
-            if (id.includes('@radix-ui')) {
-              return 'radix-vendor';
-            }
             if (id.includes('recharts')) {
               return 'chart-vendor';
             }
@@ -55,6 +49,8 @@ export default defineConfig(({ mode }) => ({
             if (id.includes('@tanstack')) {
               return 'query-vendor';
             }
+            // Keep React, React-DOM, React Router, and Radix UI together in vendor chunk
+            // This prevents React import resolution issues
             return 'vendor';
           }
           
