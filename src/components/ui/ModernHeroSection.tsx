@@ -117,8 +117,8 @@ export const ModernHeroSection: React.FC<ModernHeroSectionProps> = ({
         audioRef.current.pause();
         setIsPlaying(false);
       } else {
-        // Select audio source based on location and variant
-        const audioSrc = variant === 'summary' && location === 'Kwality House' 
+        // Select audio source based on variant and location
+        const audioSrc = (variant === 'sales' || (variant === 'summary' && location === 'Kwality House'))
           ? '/kwality-house-audio.mp3' 
           : '/placeholder-audio.mp3';
         
