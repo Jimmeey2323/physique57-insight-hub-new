@@ -496,8 +496,8 @@ export const ClientConversionSimplifiedRanks: React.FC<ClientConversionSimplifie
     }).filter(stat => stat.totalClients > 0);
   }, [data, previousPeriodClientData]);
 
-  // All available metrics without grouping
-  const metricOptions = [
+  // All available metrics without any filtering
+  const availableMetrics = [
     { id: 'conversion', label: 'Conversion Rate', icon: Trophy, metric: 'conversionRate' },
     { id: 'sessions', label: 'Total Sessions', icon: Calendar, metric: 'totalSessions' },
     { id: 'average', label: 'Class Average', icon: BarChart3, metric: 'classAverage' },
@@ -505,28 +505,6 @@ export const ClientConversionSimplifiedRanks: React.FC<ClientConversionSimplifie
     { id: 'customers', label: 'Total Customers', icon: Users, metric: 'totalCustomers' },
     { id: 'ltv', label: 'Average LTV', icon: DollarSign, metric: 'avgLTV' },
   ];
-
-  // Filter metric options based on selectedMetric prop or show all
-  const availableMetrics = React.useMemo(() => {
-    if (!selectedMetric) return metricOptions;
-    
-    // Show specific metrics based on selectedMetric
-    switch (selectedMetric) {
-      case 'conversion':
-        return metricOptions.filter(m => m.id === 'conversion');
-      case 'empty':
-        return metricOptions.filter(m => m.id === 'empty');
-      case 'sessions':
-        return metricOptions.filter(m => m.id === 'sessions');
-      case 'attendance':
-        return metricOptions.filter(m => m.id === 'average');
-      case 'revenue':
-      case 'ltv':
-        return metricOptions.filter(m => m.id === 'ltv');
-      default:
-        return metricOptions;
-    }
-  }, [selectedMetric]);
 
   // Get current ranking key based on type and metric
   const getCurrentRankingKey = (type: string, metricId: string) => {
