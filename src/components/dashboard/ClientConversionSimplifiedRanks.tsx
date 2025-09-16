@@ -496,30 +496,36 @@ export const ClientConversionSimplifiedRanks: React.FC<ClientConversionSimplifie
     }).filter(stat => stat.totalClients > 0);
   }, [data, previousPeriodClientData]);
 
-  // Simplified ranking options based on metric types
+  // All available metrics without grouping
   const metricOptions = [
-    { id: 'conversion', label: 'Conversion Rate', icon: Trophy, metric: 'conversionRate', category: 'conversion' },
-    { id: 'sessions', label: 'Total Sessions', icon: Calendar, metric: 'totalSessions', category: 'sessions' },
-    { id: 'average', label: 'Class Average', icon: BarChart3, metric: 'classAverage', category: 'attendance' },
-    { id: 'empty', label: 'Empty Classes', icon: XCircle, metric: 'emptyClassRate', category: 'empty' },
+    { id: 'conversion', label: 'Conversion Rate', icon: Trophy, metric: 'conversionRate' },
+    { id: 'sessions', label: 'Total Sessions', icon: Calendar, metric: 'totalSessions' },
+    { id: 'average', label: 'Class Average', icon: BarChart3, metric: 'classAverage' },
+    { id: 'empty', label: 'Empty Classes', icon: XCircle, metric: 'emptyClassRate' },
+    { id: 'customers', label: 'Total Customers', icon: Users, metric: 'totalCustomers' },
+    { id: 'ltv', label: 'Average LTV', icon: DollarSign, metric: 'avgLTV' },
   ];
 
-  // Filter metric options based on selectedMetric prop
+  // Filter metric options based on selectedMetric prop or show all
   const availableMetrics = React.useMemo(() => {
     if (!selectedMetric) return metricOptions;
     
-    // Map selectedMetric to categories that should be shown
-    const metricToCategories: Record<string, string[]> = {
-      'conversion': ['conversion'],
-      'empty': ['empty'],
-      'sessions': ['sessions'],
-      'attendance': ['attendance'],
-      'revenue': ['revenue'],
-      'ltv': ['revenue']
-    };
-    
-    const allowedCategories = metricToCategories[selectedMetric] || ['conversion'];
-    return metricOptions.filter(option => allowedCategories.includes(option.category));
+    // Show specific metrics based on selectedMetric
+    switch (selectedMetric) {
+      case 'conversion':
+        return metricOptions.filter(m => m.id === 'conversion');
+      case 'empty':
+        return metricOptions.filter(m => m.id === 'empty');
+      case 'sessions':
+        return metricOptions.filter(m => m.id === 'sessions');
+      case 'attendance':
+        return metricOptions.filter(m => m.id === 'average');
+      case 'revenue':
+      case 'ltv':
+        return metricOptions.filter(m => m.id === 'ltv');
+      default:
+        return metricOptions;
+    }
   }, [selectedMetric]);
 
   // Get current ranking key based on type and metric
@@ -883,7 +889,7 @@ export const ClientConversionSimplifiedRanks: React.FC<ClientConversionSimplifie
           </div>
 
           {/* Metric Tabs */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
             {availableMetrics.map((metric) => (
               <Button
                 key={metric.id}
