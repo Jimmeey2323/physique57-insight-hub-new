@@ -25,18 +25,112 @@ import { NewClientData, PayrollData } from '@/types/dashboard';
 interface ClientConversionSimplifiedRanksProps {
   data: NewClientData[];
   payrollData: PayrollData[];
+  allPayrollData: PayrollData[];
+  allClientData: NewClientData[];
   selectedLocation: string;
+  dateRange: { start: string; end: string };
   onDrillDown?: (type: string, item: any, metric: string) => void;
 }
 
 export const ClientConversionSimplifiedRanks: React.FC<ClientConversionSimplifiedRanksProps> = ({ 
   data, 
   payrollData, 
+  allPayrollData,
+  allClientData,
   selectedLocation, 
+  dateRange,
   onDrillDown 
 }) => {
   const [selectedRanking, setSelectedRanking] = useState('trainer-conversion');
   const [showMore, setShowMore] = useState(false);
+
+  // Calculate previous period dates for growth comparison
+  const getPreviousPeriod = (currentStart: string, currentEnd: string) => {
+    const start = new Date(currentStart);
+    const end = new Date(currentEnd);
+    const periodLength = end.getTime() - start.getTime();
+    
+    const prevEnd = new Date(start.getTime() - 24 * 60 * 60 * 1000); // day before current start
+    const prevStart = new Date(prevEnd.getTime() - periodLength);
+    
+    return {
+      start: prevStart.toISOString().split('T')[0],
+      end: prevEnd.toISOString().split('T')[0]
+    };
+  };
+
+  // Get filtered data for previous period
+  const getPreviousPeriodData = (isClient: boolean = true) => {
+    if (!dateRange.start || !dateRange.end) return [];
+    
+    const prevPeriod = getPreviousPeriod(dateRange.start, dateRange.end);
+    const dataSource = isClient ? allClientData : allPayrollData;
+    
+    return dataSource.filter(item => {
+      if (isClient) {
+        const client = item as NewClientData;
+        if (!client.firstVisitDate) return false;
+        
+        const itemDate = new Date(client.firstVisitDate);
+        const prevStart = new Date(prevPeriod.start);
+        const prevEnd = new Date(prevPeriod.end);
+        
+        return itemDate >= prevStart && itemDate <= prevEnd;
+      } else {
+        const payroll = item as PayrollData;
+        if (!payroll.monthYear) return false;
+        
+        // Parse monthYear and check if it falls in previous period
+        let payrollDate: Date;
+        if (payroll.monthYear.includes('-')) {
+          payrollDate = new Date(payroll.monthYear + '-01');
+        } else {
+          payrollDate = new Date(payroll.monthYear + ' 01');
+        }
+        
+        if (isNaN(payrollDate.getTime())) return false;
+        
+        const prevStart = new Date(prevPeriod.start);
+        const prevEnd = new Date(prevPeriod.end);
+        
+        return payrollDate >= prevStart && payrollDate <= prevEnd;
+      }
+    });
+  };
+
+  // Apply location filter to previous period data
+  const filterByLocation = (dataArray: any[], isClient: boolean = true) => {
+    if (selectedLocation === 'All Locations') return dataArray;
+    
+    return dataArray.filter(item => {
+      if (isClient) {
+        const client = item as NewClientData;
+        const firstLocation = client.firstVisitLocation || '';
+        const homeLocation = client.homeLocation || '';
+        
+        if (selectedLocation === 'Kenkere House, Bengaluru') {
+          const matchesFirst = firstLocation.toLowerCase().includes('kenkere') || firstLocation.toLowerCase().includes('bengaluru') || firstLocation === 'Kenkere House';
+          const matchesHome = homeLocation.toLowerCase().includes('kenkere') || homeLocation.toLowerCase().includes('bengaluru') || homeLocation === 'Kenkere House';
+          return matchesFirst || matchesHome;
+        }
+        
+        return firstLocation === selectedLocation || homeLocation === selectedLocation;
+      } else {
+        const payroll = item as PayrollData;
+        const payrollLocation = payroll.location || '';
+        
+        if (selectedLocation === 'Kenkere House, Bengaluru') {
+          return payrollLocation.toLowerCase().includes('kenkere') || 
+                 payrollLocation.toLowerCase().includes('bengaluru');
+        }
+        
+        return payrollLocation === selectedLocation;
+      }
+    });
+  };
+
+  const previousPeriodClientData = filterByLocation(getPreviousPeriodData(true), true);
+  const previousPeriodPayrollData = filterByLocation(getPreviousPeriodData(false), false);
 
   // Filter payroll data based on selected location
   const filteredPayrollData = React.useMemo(() => {
@@ -58,13 +152,14 @@ export const ClientConversionSimplifiedRanks: React.FC<ClientConversionSimplifie
     });
   }, [payrollData, selectedLocation]);
 
-  // Calculate trainer stats using both filtered New Client data and filtered Payroll data
+  // Calculate trainer stats using both filtered New Client data and filtered Payroll data with growth
   const trainerStats = React.useMemo(() => {
     if (!filteredPayrollData || filteredPayrollData.length === 0) return [];
     
     const stats = new Map();
+    const prevStats = new Map();
     
-    // First, get base stats from filtered payroll data (class data)
+    // Calculate current period stats
     filteredPayrollData.forEach(payroll => {
       const trainer = payroll.teacherName;
       if (!trainer || trainer === 'Unknown') return;
@@ -95,7 +190,7 @@ export const ClientConversionSimplifiedRanks: React.FC<ClientConversionSimplifie
       trainerStat.totalNew += payroll.new || 0;
     });
     
-    // Then, add filtered client data for LTV calculations
+    // Add client data for LTV calculations
     data.forEach(client => {
       const trainer = client.trainerName;
       if (!trainer || trainer === 'Unknown' || !stats.has(trainer)) return;
@@ -104,24 +199,94 @@ export const ClientConversionSimplifiedRanks: React.FC<ClientConversionSimplifie
       trainerStat.totalLTV += client.ltv || 0;
       trainerStat.clientCount++;
     });
-    
-    return Array.from(stats.values()).map(stat => ({
-      ...stat,
-      conversionRate: stat.totalNew > 0 ? (stat.totalConverted / stat.totalNew) * 100 : 0,
-      retentionRate: stat.totalConverted > 0 ? (stat.totalRetained / stat.totalConverted) * 100 : 0,
-      classAverage: stat.totalNonEmptySessions > 0 ? stat.totalCustomers / stat.totalNonEmptySessions : 0,
-      avgLTV: stat.clientCount > 0 ? stat.totalLTV / stat.clientCount : 0,
-      emptyClassRate: stat.totalSessions > 0 ? (stat.totalEmptySessions / stat.totalSessions) * 100 : 0
-    })).filter(stat => stat.totalSessions > 0); // Only include trainers with sessions
-  }, [data, filteredPayrollData]);
 
-  // Calculate location stats using both filtered datasets
+    // Calculate previous period stats for growth comparison
+    previousPeriodPayrollData.forEach(payroll => {
+      const trainer = payroll.teacherName;
+      if (!trainer || trainer === 'Unknown') return;
+      
+      if (!prevStats.has(trainer)) {
+        prevStats.set(trainer, {
+          totalSessions: 0,
+          totalEmptySessions: 0,
+          totalNonEmptySessions: 0,
+          totalCustomers: 0,
+          totalConverted: 0,
+          totalRetained: 0,
+          totalNew: 0,
+          totalLTV: 0,
+          clientCount: 0
+        });
+      }
+      
+      const trainerStat = prevStats.get(trainer);
+      trainerStat.totalSessions += payroll.totalSessions || 0;
+      trainerStat.totalEmptySessions += payroll.totalEmptySessions || 0;
+      trainerStat.totalNonEmptySessions += payroll.totalNonEmptySessions || 0;
+      trainerStat.totalCustomers += payroll.totalCustomers || 0;
+      trainerStat.totalConverted += payroll.converted || 0;
+      trainerStat.totalRetained += payroll.retained || 0;
+      trainerStat.totalNew += payroll.new || 0;
+    });
+
+    // Add previous period client data
+    previousPeriodClientData.forEach(client => {
+      const trainer = client.trainerName;
+      if (!trainer || trainer === 'Unknown' || !prevStats.has(trainer)) return;
+      
+      const trainerStat = prevStats.get(trainer);
+      trainerStat.totalLTV += client.ltv || 0;
+      trainerStat.clientCount++;
+    });
+    
+    return Array.from(stats.values()).map(stat => {
+      const conversionRate = stat.totalNew > 0 ? (stat.totalConverted / stat.totalNew) * 100 : 0;
+      const retentionRate = stat.totalConverted > 0 ? (stat.totalRetained / stat.totalConverted) * 100 : 0;
+      const classAverage = stat.totalNonEmptySessions > 0 ? stat.totalCustomers / stat.totalNonEmptySessions : 0;
+      const avgLTV = stat.clientCount > 0 ? stat.totalLTV / stat.clientCount : 0;
+      const emptyClassRate = stat.totalSessions > 0 ? (stat.totalEmptySessions / stat.totalSessions) * 100 : 0;
+
+      // Calculate growth metrics
+      const prevStat = prevStats.get(stat.name);
+      let conversionGrowth = 0;
+      let classAverageGrowth = 0;
+      let sessionsGrowth = 0;
+      let emptyClassRateGrowth = 0;
+
+      if (prevStat) {
+        const prevConversionRate = prevStat.totalNew > 0 ? (prevStat.totalConverted / prevStat.totalNew) * 100 : 0;
+        const prevClassAverage = prevStat.totalNonEmptySessions > 0 ? prevStat.totalCustomers / prevStat.totalNonEmptySessions : 0;
+        const prevEmptyClassRate = prevStat.totalSessions > 0 ? (prevStat.totalEmptySessions / prevStat.totalSessions) * 100 : 0;
+
+        conversionGrowth = prevConversionRate > 0 ? ((conversionRate - prevConversionRate) / prevConversionRate) * 100 : 0;
+        classAverageGrowth = prevClassAverage > 0 ? ((classAverage - prevClassAverage) / prevClassAverage) * 100 : 0;
+        sessionsGrowth = prevStat.totalSessions > 0 ? ((stat.totalSessions - prevStat.totalSessions) / prevStat.totalSessions) * 100 : 0;
+        emptyClassRateGrowth = prevEmptyClassRate > 0 ? ((emptyClassRate - prevEmptyClassRate) / prevEmptyClassRate) * 100 : 0;
+      }
+
+      return {
+        ...stat,
+        conversionRate,
+        retentionRate,
+        classAverage,
+        avgLTV,
+        emptyClassRate,
+        conversionGrowth,
+        classAverageGrowth,
+        sessionsGrowth,
+        emptyClassRateGrowth
+      };
+    }).filter(stat => stat.totalSessions > 0);
+  }, [data, filteredPayrollData, previousPeriodPayrollData, previousPeriodClientData]);
+
+  // Calculate location stats using both filtered datasets with growth
   const locationStats = React.useMemo(() => {
     if (!filteredPayrollData || filteredPayrollData.length === 0) return [];
     
     const stats = new Map();
+    const prevStats = new Map();
     
-    // Get base stats from filtered payroll data
+    // Current period stats
     filteredPayrollData.forEach(payroll => {
       const location = payroll.location;
       if (!location) return;
@@ -151,7 +316,7 @@ export const ClientConversionSimplifiedRanks: React.FC<ClientConversionSimplifie
       locationStat.totalNew += payroll.new || 0;
     });
     
-    // Add filtered client data for LTV calculations
+    // Add client data for LTV
     data.forEach(client => {
       const location = client.firstVisitLocation || client.homeLocation;
       if (!location || !stats.has(location)) return;
@@ -160,21 +325,86 @@ export const ClientConversionSimplifiedRanks: React.FC<ClientConversionSimplifie
       locationStat.totalLTV += client.ltv || 0;
       locationStat.clientCount++;
     });
-    
-    return Array.from(stats.values()).map(stat => ({
-      ...stat,
-      conversionRate: stat.totalNew > 0 ? (stat.totalConverted / stat.totalNew) * 100 : 0,
-      retentionRate: stat.totalConverted > 0 ? (stat.totalRetained / stat.totalConverted) * 100 : 0,
-      classAverage: stat.totalNonEmptySessions > 0 ? stat.totalCustomers / stat.totalNonEmptySessions : 0,
-      avgLTV: stat.clientCount > 0 ? stat.totalLTV / stat.clientCount : 0,
-      emptyClassRate: stat.totalSessions > 0 ? (stat.totalEmptySessions / stat.totalSessions) * 100 : 0
-    })).filter(stat => stat.totalSessions > 0);
-  }, [data, filteredPayrollData]);
 
-  // Calculate membership stats from filtered client data only
+    // Previous period stats
+    previousPeriodPayrollData.forEach(payroll => {
+      const location = payroll.location;
+      if (!location) return;
+      
+      if (!prevStats.has(location)) {
+        prevStats.set(location, {
+          totalSessions: 0,
+          totalEmptySessions: 0,
+          totalNonEmptySessions: 0,
+          totalCustomers: 0,
+          totalConverted: 0,
+          totalRetained: 0,
+          totalNew: 0,
+          totalLTV: 0,
+          clientCount: 0
+        });
+      }
+      
+      const locationStat = prevStats.get(location);
+      locationStat.totalSessions += payroll.totalSessions || 0;
+      locationStat.totalEmptySessions += payroll.totalEmptySessions || 0;
+      locationStat.totalNonEmptySessions += payroll.totalNonEmptySessions || 0;
+      locationStat.totalCustomers += payroll.totalCustomers || 0;
+      locationStat.totalConverted += payroll.converted || 0;
+      locationStat.totalRetained += payroll.retained || 0;
+      locationStat.totalNew += payroll.new || 0;
+    });
+
+    previousPeriodClientData.forEach(client => {
+      const location = client.firstVisitLocation || client.homeLocation;
+      if (!location || !prevStats.has(location)) return;
+      
+      const locationStat = prevStats.get(location);
+      locationStat.totalLTV += client.ltv || 0;
+      locationStat.clientCount++;
+    });
+    
+    return Array.from(stats.values()).map(stat => {
+      const conversionRate = stat.totalNew > 0 ? (stat.totalConverted / stat.totalNew) * 100 : 0;
+      const retentionRate = stat.totalConverted > 0 ? (stat.totalRetained / stat.totalConverted) * 100 : 0;
+      const classAverage = stat.totalNonEmptySessions > 0 ? stat.totalCustomers / stat.totalNonEmptySessions : 0;
+      const avgLTV = stat.clientCount > 0 ? stat.totalLTV / stat.clientCount : 0;
+      const emptyClassRate = stat.totalSessions > 0 ? (stat.totalEmptySessions / stat.totalSessions) * 100 : 0;
+
+      // Calculate growth metrics
+      const prevStat = prevStats.get(stat.name);
+      let sessionsGrowth = 0;
+      let customersGrowth = 0;
+      let classAverageGrowth = 0;
+
+      if (prevStat) {
+        const prevClassAverage = prevStat.totalNonEmptySessions > 0 ? prevStat.totalCustomers / prevStat.totalNonEmptySessions : 0;
+        
+        sessionsGrowth = prevStat.totalSessions > 0 ? ((stat.totalSessions - prevStat.totalSessions) / prevStat.totalSessions) * 100 : 0;
+        customersGrowth = prevStat.totalCustomers > 0 ? ((stat.totalCustomers - prevStat.totalCustomers) / prevStat.totalCustomers) * 100 : 0;
+        classAverageGrowth = prevClassAverage > 0 ? ((classAverage - prevClassAverage) / prevClassAverage) * 100 : 0;
+      }
+
+      return {
+        ...stat,
+        conversionRate,
+        retentionRate,
+        classAverage,
+        avgLTV,
+        emptyClassRate,
+        sessionsGrowth,
+        customersGrowth,
+        classAverageGrowth
+      };
+    }).filter(stat => stat.totalSessions > 0);
+  }, [data, filteredPayrollData, previousPeriodPayrollData, previousPeriodClientData]);
+
+  // Calculate membership stats from filtered client data with growth
   const membershipStats = React.useMemo(() => {
     const stats = new Map();
+    const prevStats = new Map();
     
+    // Current period stats
     data.forEach(client => {
       const membership = client.membershipUsed || 'Unknown Membership';
       if (!stats.has(membership)) {
@@ -202,14 +432,66 @@ export const ClientConversionSimplifiedRanks: React.FC<ClientConversionSimplifie
         membershipStat.retained++;
       }
     });
+
+    // Previous period stats
+    previousPeriodClientData.forEach(client => {
+      const membership = client.membershipUsed || 'Unknown Membership';
+      if (!prevStats.has(membership)) {
+        prevStats.set(membership, {
+          totalClients: 0,
+          newMembers: 0,
+          converted: 0,
+          retained: 0,
+          totalLTV: 0
+        });
+      }
+      
+      const membershipStat = prevStats.get(membership);
+      membershipStat.totalClients++;
+      membershipStat.totalLTV += client.ltv || 0;
+      
+      if (String(client.isNew || '').includes('New')) {
+        membershipStat.newMembers++;
+      }
+      if (client.conversionStatus === 'Converted') {
+        membershipStat.converted++;
+      }
+      if (client.retentionStatus === 'Retained') {
+        membershipStat.retained++;
+      }
+    });
     
-    return Array.from(stats.values()).map(stat => ({
-      ...stat,
-      conversionRate: stat.newMembers > 0 ? (stat.converted / stat.newMembers) * 100 : 0,
-      retentionRate: stat.converted > 0 ? (stat.retained / stat.converted) * 100 : 0,
-      avgLTV: stat.totalClients > 0 ? stat.totalLTV / stat.totalClients : 0
-    })).filter(stat => stat.totalClients > 0);
-  }, [data]);
+    return Array.from(stats.values()).map(stat => {
+      const conversionRate = stat.newMembers > 0 ? (stat.converted / stat.newMembers) * 100 : 0;
+      const retentionRate = stat.converted > 0 ? (stat.retained / stat.converted) * 100 : 0;
+      const avgLTV = stat.totalClients > 0 ? stat.totalLTV / stat.totalClients : 0;
+
+      // Calculate growth metrics
+      const prevStat = prevStats.get(stat.name);
+      let conversionGrowth = 0;
+      let clientsGrowth = 0;
+      let ltvGrowth = 0;
+
+      if (prevStat) {
+        const prevConversionRate = prevStat.newMembers > 0 ? (prevStat.converted / prevStat.newMembers) * 100 : 0;
+        const prevAvgLTV = prevStat.totalClients > 0 ? prevStat.totalLTV / prevStat.totalClients : 0;
+
+        conversionGrowth = prevConversionRate > 0 ? ((conversionRate - prevConversionRate) / prevConversionRate) * 100 : 0;
+        clientsGrowth = prevStat.totalClients > 0 ? ((stat.totalClients - prevStat.totalClients) / prevStat.totalClients) * 100 : 0;
+        ltvGrowth = prevAvgLTV > 0 ? ((avgLTV - prevAvgLTV) / prevAvgLTV) * 100 : 0;
+      }
+
+      return {
+        ...stat,
+        conversionRate,
+        retentionRate,
+        avgLTV,
+        conversionGrowth,
+        clientsGrowth,
+        ltvGrowth
+      };
+    }).filter(stat => stat.totalClients > 0);
+  }, [data, previousPeriodClientData]);
 
   // Simplified ranking options - only the most important metrics
   const rankingOptions = [
@@ -295,61 +577,99 @@ export const ClientConversionSimplifiedRanks: React.FC<ClientConversionSimplifie
   };
 
   const RankCard = ({ title, data: rankData, isTop = true }) => (
-    <Card className="group bg-white shadow-lg border-0 overflow-hidden hover:shadow-2xl transition-all duration-500 hover:scale-105">
-      <CardHeader className={`bg-gradient-to-r ${
+    <Card className="group relative overflow-hidden bg-white shadow-xl border-0 hover:shadow-2xl transition-all duration-500 hover:scale-[1.02] hover:-translate-y-1 transform-gpu">
+      {/* Animated background pattern */}
+      <div className="absolute inset-0 bg-gradient-to-br from-white via-slate-50/30 to-white opacity-50" />
+      
+      <CardHeader className={`relative bg-gradient-to-r ${
         isTop 
-          ? 'from-emerald-500 to-teal-600' 
-          : 'from-orange-500 to-red-600'
-      } text-white relative overflow-hidden`}>
-        <div className="absolute top-0 right-0 w-20 h-20 transform translate-x-8 -translate-y-8 opacity-20">
-          {isTop ? <Crown className="w-20 h-20" /> : <AlertTriangle className="w-20 h-20" />}
+          ? 'from-emerald-500 via-emerald-600 to-teal-600' 
+          : 'from-orange-500 via-orange-600 to-red-600'
+      } text-white border-0 shadow-lg`}>
+        <div className="absolute top-0 right-0 w-24 h-24 transform translate-x-10 -translate-y-10 opacity-20 group-hover:opacity-30 transition-opacity duration-500">
+          {isTop ? <Crown className="w-24 h-24" /> : <AlertTriangle className="w-24 h-24" />}
         </div>
         <CardTitle className="flex items-center gap-3 relative z-10">
-          {isTop ? <Crown className="w-6 h-6" /> : <AlertTriangle className="w-6 h-6" />}
+          <div className="p-2 bg-white/20 rounded-xl backdrop-blur-sm group-hover:scale-110 transition-transform duration-300">
+            {isTop ? <Crown className="w-6 h-6" /> : <AlertTriangle className="w-6 h-6" />}
+          </div>
           <div>
             <h3 className="text-lg font-bold">{title}</h3>
-            <p className="text-sm opacity-90 font-normal">
+            <p className="text-sm opacity-90 font-medium">
               {isTop ? 'Top performers' : 'Needs attention'}
             </p>
           </div>
         </CardTitle>
       </CardHeader>
-      <CardContent className="p-6 space-y-4">
+      <CardContent className="relative p-6 space-y-4 bg-gradient-to-br from-white to-slate-50/30">
         {rankData.map((item, index) => (
           <div 
             key={item.name} 
-            className="flex items-center justify-between p-4 bg-gradient-to-r from-slate-50 to-slate-100 rounded-xl hover:from-slate-100 hover:to-slate-200 transition-all duration-300 group-hover:scale-105 cursor-pointer hover:shadow-md"
+            className="group/item flex items-center justify-between p-4 bg-gradient-to-r from-white via-slate-50/50 to-white rounded-xl border border-slate-100 hover:border-slate-200 hover:shadow-lg transition-all duration-300 cursor-pointer hover:scale-[1.02] transform-gpu"
             onClick={() => onDrillDown?.(currentOption?.type || 'trainer', item, currentOption?.metric || 'conversionRate')}
           >
             <div className="flex items-center gap-4">
-              <div className={`flex items-center justify-center w-10 h-10 rounded-full font-bold text-sm transition-all duration-300 ${
-                index === 0 && isTop ? 'bg-gradient-to-r from-yellow-400 to-yellow-600 text-white shadow-lg' :
-                index === 1 && isTop ? 'bg-gradient-to-r from-gray-300 to-gray-500 text-white shadow-lg' :
-                index === 2 && isTop ? 'bg-gradient-to-r from-orange-400 to-orange-600 text-white shadow-lg' :
-                'bg-gradient-to-r from-slate-200 to-slate-300 text-slate-600'
+              <div className={`flex items-center justify-center w-11 h-11 rounded-full font-bold text-sm transition-all duration-300 shadow-md group-hover/item:scale-110 transform-gpu ${
+                index === 0 && isTop ? 'bg-gradient-to-br from-yellow-400 via-yellow-500 to-yellow-600 text-white shadow-yellow-300/30' :
+                index === 1 && isTop ? 'bg-gradient-to-br from-gray-300 via-gray-400 to-gray-500 text-white shadow-gray-300/30' :
+                index === 2 && isTop ? 'bg-gradient-to-br from-orange-400 via-orange-500 to-orange-600 text-white shadow-orange-300/30' :
+                'bg-gradient-to-br from-slate-200 via-slate-250 to-slate-300 text-slate-700 shadow-slate-200/30'
               }`}>
-                {index + 1}
+                {index === 0 && isTop ? '👑' : 
+                 index === 1 && isTop ? '🥈' : 
+                 index === 2 && isTop ? '🥉' : 
+                 `#${index + 1}`}
               </div>
-              <div>
-                <p className="font-bold text-slate-900 truncate max-w-[200px]" title={item.name}>
+              <div className="flex-1 min-w-0">
+                <p className="font-bold text-slate-900 truncate max-w-[200px] group-hover/item:text-slate-800 transition-colors" title={item.name}>
                   {item.name}
                 </p>
-                <p className="text-sm text-slate-500">
+                <p className="text-sm text-slate-500 group-hover/item:text-slate-600 transition-colors">
                   {getSecondaryMetric(item, currentOption?.type || 'trainer')}
                 </p>
               </div>
             </div>
             <div className="text-right flex items-center gap-2">
               <div>
-                <Badge 
-                  className={`font-bold text-sm px-3 py-1 ${
-                    isTop 
-                      ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' 
-                      : 'bg-orange-100 text-orange-800 border border-orange-200'
-                  }`}
-                >
-                  {formatValue(item[currentOption?.metric || 'conversionRate'], currentOption?.metric || 'conversionRate')}
-                </Badge>
+                <div className="flex items-center gap-2">
+                  <Badge 
+                    className={`font-bold text-sm px-3 py-1 ${
+                      isTop 
+                        ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' 
+                        : 'bg-orange-100 text-orange-800 border border-orange-200'
+                    }`}
+                  >
+                    {formatValue(item[currentOption?.metric || 'conversionRate'], currentOption?.metric || 'conversionRate')}
+                  </Badge>
+                  {/* Growth Indicator */}
+                  {(() => {
+                    const getGrowthMetric = () => {
+                      if (currentOption?.metric === 'conversionRate') return item.conversionGrowth;
+                      if (currentOption?.metric === 'classAverage') return item.classAverageGrowth;
+                      if (currentOption?.metric === 'totalSessions') return item.sessionsGrowth;
+                      if (currentOption?.metric === 'emptyClassRate') return item.emptyClassRateGrowth;
+                      if (currentOption?.metric === 'totalCustomers') return item.customersGrowth;
+                      if (currentOption?.metric === 'totalClients') return item.clientsGrowth;
+                      if (currentOption?.metric === 'avgLTV') return item.ltvGrowth;
+                      return 0;
+                    };
+                    
+                    const growth = getGrowthMetric();
+                    if (growth && Math.abs(growth) > 0.1) {
+                      return (
+                        <div className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
+                          growth > 0 
+                            ? 'bg-green-100 text-green-700' 
+                            : 'bg-red-100 text-red-700'
+                        }`}>
+                          {growth > 0 ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
+                          {Math.abs(growth).toFixed(1)}%
+                        </div>
+                      );
+                    }
+                    return null;
+                  })()}
+                </div>
                 {(currentOption?.type === 'trainer' || currentOption?.type === 'location') && (
                   <p className="text-xs text-slate-500 mt-1">
                     {item.classAverage?.toFixed(1)} avg

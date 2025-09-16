@@ -57,19 +57,19 @@ export const UniformTrainerTable: React.FC<UniformTrainerTableProps> = ({
       <Table className="w-full table-fixed">
         <TableHeader className={cn(
           stickyHeader && "sticky top-0 z-20",
-          "bg-gradient-to-r text-primary-foreground border-none shadow-sm",
-          headerGradient
+          "bg-gradient-to-r border-none shadow-sm",
+          `bg-gradient-to-r ${headerGradient}`
         )}>
           <TableRow className="border-none" style={{
           height: '48px'
         }}>
-            {columns.map(column => <TableHead key={column.key} className={cn("font-bold text-primary-foreground px-4 text-sm whitespace-nowrap", column.align === 'center' && 'text-center', column.align === 'right' && 'text-right', column.sortable && 'cursor-pointer hover:bg-primary-foreground/10 transition-colors', column.className)} style={{
+            {columns.map(column => <TableHead key={column.key} className={cn("font-bold text-white px-4 text-sm whitespace-nowrap", column.align === 'center' && 'text-center', column.align === 'right' && 'text-right', column.sortable && 'cursor-pointer hover:bg-white/10 transition-colors', column.className)} style={{
             height: '48px',
             width: column.width || 'auto'
           }} onClick={() => handleSort(column)}>
-                <div className="flex items-center gap-2 h-full">
+                <div className="flex items-center gap-2 h-full text-white">
                   {column.header}
-                  {column.sortable && sortField === column.key && (sortDirection === 'asc' ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />)}
+                  {column.sortable && sortField === column.key && (sortDirection === 'asc' ? <ChevronUp className="w-4 h-4 text-white" /> : <ChevronDown className="w-4 h-4 text-white" />)}
                 </div>
               </TableHead>)}
           </TableRow>
@@ -91,11 +91,11 @@ export const UniformTrainerTable: React.FC<UniformTrainerTableProps> = ({
             <TableRow className="hover:bg-primary/95 border-none" style={{
           height: '44px'
         }}>
-              {columns.map(column => <TableCell key={column.key} className={cn("font-bold text-primary-foreground px-4 py-3 text-sm", column.align === 'center' && 'text-center', column.align === 'right' && 'text-right', column.className)} style={{
+              {columns.map(column => <TableCell key={column.key} className={cn("font-bold text-white px-4 py-3 text-sm", column.align === 'center' && 'text-center', column.align === 'right' && 'text-right', column.className)} style={{
             height: '44px'
           }}>
-                  <div className="flex items-center h-full">
-                    {column.render ? column.render(footerData[column.key], footerData) : <span className="truncate">{footerData[column.key]}</span>}
+                  <div className="flex items-center h-full text-white">
+                    {column.render ? column.render(footerData[column.key], footerData) : <span className="truncate text-white">{footerData[column.key]}</span>}
                   </div>
                 </TableCell>)}
             </TableRow>

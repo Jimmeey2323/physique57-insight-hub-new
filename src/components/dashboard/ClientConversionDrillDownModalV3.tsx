@@ -6,7 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { formatCurrency, formatNumber } from '@/utils/formatters';
-import { TrendingUp, TrendingDown, Users, ShoppingCart, Calendar, MapPin, BarChart3, DollarSign, Activity, CreditCard, Target, Clock, Star, Zap, X, Trophy } from 'lucide-react';
+import { TrendingUp, TrendingDown, Users, ShoppingCart, Calendar, MapPin, BarChart3, DollarSign, Activity, CreditCard, Target, Clock, Star, Zap, X, Trophy, Table as TableIcon } from 'lucide-react';
 import { NewClientData } from '@/types/dashboard';
 interface ClientConversionDrillDownModalV3Props {
   isOpen: boolean;
@@ -363,6 +363,134 @@ export const ClientConversionDrillDownModalV3: React.FC<ClientConversionDrillDow
                     </CardContent>
                   </Card>
                 </div>
+
+                {/* Transaction-Level Details */}
+                <Card className="bg-gradient-to-br from-slate-50 to-slate-100 border-slate-200">
+                  <CardHeader>
+                    <CardTitle className="text-slate-800 flex items-center gap-2">
+                      <TableIcon className="w-5 h-5" />
+                      Transaction-Level Details
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                      {/* Client Data */}
+                      {data.relatedClients && data.relatedClients.length > 0 && (
+                        <div>
+                          <h4 className="font-semibold text-slate-700 mb-3 flex items-center gap-2">
+                            <Users className="w-4 h-4" />
+                            Client Records ({data.relatedClients.length})
+                          </h4>
+                          <div className="bg-white rounded-lg border overflow-hidden">
+                            <div className="overflow-y-auto max-h-64">
+                              <table className="w-full text-sm">
+                                <thead className="bg-slate-100 border-b">
+                                  <tr>
+                                    <th className="text-left p-2 font-medium text-slate-700">Name</th>
+                                    <th className="text-left p-2 font-medium text-slate-700">Status</th>
+                                    <th className="text-right p-2 font-medium text-slate-700">LTV</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {data.relatedClients.slice(0, 10).map((client, index) => (
+                                    <tr key={index} className="border-b hover:bg-slate-50">
+                                      <td className="p-2 text-slate-800">
+                                        {client.memberName || client.memberId || 'Unknown'}
+                                      </td>
+                                      <td className="p-2">
+                                        <div className="flex flex-col gap-1">
+                                          {client.conversionStatus && (
+                                            <span className={`text-xs px-2 py-1 rounded-full ${
+                                              client.conversionStatus.includes('Converted') 
+                                                ? 'bg-green-100 text-green-700' 
+                                                : 'bg-gray-100 text-gray-700'
+                                            }`}>
+                                              {client.conversionStatus}
+                                            </span>
+                                          )}
+                                          {client.isNew && String(client.isNew).includes('New') && (
+                                            <span className="text-xs px-2 py-1 rounded-full bg-blue-100 text-blue-700">
+                                              New
+                                            </span>
+                                          )}
+                                        </div>
+                                      </td>
+                                      <td className="p-2 text-right font-medium">
+                                        {formatCurrency(client.ltv || 0)}
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                            {data.relatedClients.length > 10 && (
+                              <div className="p-2 bg-slate-50 border-t text-center text-xs text-slate-600">
+                                Showing 10 of {data.relatedClients.length} records
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Payroll Data */}
+                      {data.relatedPayroll && data.relatedPayroll.length > 0 && (
+                        <div>
+                          <h4 className="font-semibold text-slate-700 mb-3 flex items-center gap-2">
+                            <Calendar className="w-4 h-4" />
+                            Payroll Records ({data.relatedPayroll.length})
+                          </h4>
+                          <div className="bg-white rounded-lg border overflow-hidden">
+                            <div className="overflow-y-auto max-h-64">
+                              <table className="w-full text-sm">
+                                <thead className="bg-slate-100 border-b">
+                                  <tr>
+                                    <th className="text-left p-2 font-medium text-slate-700">Period</th>
+                                    <th className="text-center p-2 font-medium text-slate-700">Sessions</th>
+                                    <th className="text-center p-2 font-medium text-slate-700">Customers</th>
+                                    <th className="text-right p-2 font-medium text-slate-700">Avg</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {data.relatedPayroll.slice(0, 10).map((payroll, index) => (
+                                    <tr key={index} className="border-b hover:bg-slate-50">
+                                      <td className="p-2 text-slate-800">
+                                        {payroll.monthYear || 'Unknown'}
+                                      </td>
+                                      <td className="p-2 text-center">
+                                        <div className="flex flex-col">
+                                          <span className="font-medium">{payroll.totalSessions || 0}</span>
+                                          {payroll.totalEmptySessions > 0 && (
+                                            <span className="text-xs text-orange-600">
+                                              {payroll.totalEmptySessions} empty
+                                            </span>
+                                          )}
+                                        </div>
+                                      </td>
+                                      <td className="p-2 text-center font-medium">
+                                        {payroll.totalCustomers || 0}
+                                      </td>
+                                      <td className="p-2 text-right font-medium">
+                                        {payroll.totalNonEmptySessions > 0 
+                                          ? ((payroll.totalCustomers || 0) / payroll.totalNonEmptySessions).toFixed(1)
+                                          : '0.0'
+                                        }
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                            {data.relatedPayroll.length > 10 && (
+                              <div className="p-2 bg-slate-50 border-t text-center text-xs text-slate-600">
+                                Showing 10 of {data.relatedPayroll.length} records
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
               </TabsContent>
             )}
             
