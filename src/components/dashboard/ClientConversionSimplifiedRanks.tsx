@@ -11,29 +11,44 @@ import {
   Target, 
   Crown, 
   AlertTriangle,
-  BarChart3,
-  XCircle,
-  Calendar
+  Star,
+  Award,
+  TrendingUp,
+  Calendar,
+  Eye
 } from 'lucide-react';
 import { formatCurrency, formatNumber } from '@/utils/formatters';
 import { NewClientData, PayrollData } from '@/types/dashboard';
-import { usePayrollData } from '@/hooks/usePayrollData';
+import { cn } from '@/lib/utils';
 
 interface ClientConversionSimplifiedRanksProps {
   data: NewClientData[];
+  payrollData: PayrollData[];
+  allPayrollData: PayrollData[];
+  allClientData: NewClientData[];
+  selectedLocation: string;
+  dateRange: { start: string; end: string };
+  selectedMetric?: string;
+  onDrillDown?: (type: string, item: any, metric: string) => void;
 }
 
-export const ClientConversionSimplifiedRanks: React.FC<ClientConversionSimplifiedRanksProps> = ({ data }) => {
-  const { data: payrollData, isLoading: payrollLoading } = usePayrollData();
+export const ClientConversionSimplifiedRanks: React.FC<ClientConversionSimplifiedRanksProps> = ({ 
+  data, 
+  payrollData, 
+  allPayrollData,
+  allClientData,
+  selectedLocation, 
+  dateRange,
+  selectedMetric,
+  onDrillDown 
+}) => {
   const [selectedRanking, setSelectedRanking] = useState('trainer-conversion');
 
-  // Calculate trainer stats using both New Client data and Payroll data
+  // Calculate comprehensive trainer stats using both client and payroll data
   const trainerStats = React.useMemo(() => {
-    if (!payrollData || payrollData.length === 0) return [];
-    
     const stats = new Map();
     
-    // First, get base stats from payroll data (class data)
+    // Initialize stats from payroll data (classes taught, empty classes, etc.)
     payrollData.forEach(payroll => {
       const trainer = payroll.teacherName;
       if (!trainer || trainer === 'Unknown') return;
@@ -41,7 +56,6 @@ export const ClientConversionSimplifiedRanks: React.FC<ClientConversionSimplifie
       if (!stats.has(trainer)) {
         stats.set(trainer, {
           name: trainer,
-          location: payroll.location,
           totalSessions: 0,
           totalEmptySessions: 0,
           totalNonEmptySessions: 0,
@@ -63,8 +77,8 @@ export const ClientConversionSimplifiedRanks: React.FC<ClientConversionSimplifie
       trainerStat.totalRetained += payroll.retained || 0;
       trainerStat.totalNew += payroll.new || 0;
     });
-    
-    // Then, add client data for LTV calculations
+
+    // Add client data for LTV and additional metrics
     data.forEach(client => {
       const trainer = client.trainerName;
       if (!trainer || trainer === 'Unknown' || !stats.has(trainer)) return;
@@ -74,26 +88,47 @@ export const ClientConversionSimplifiedRanks: React.FC<ClientConversionSimplifie
       trainerStat.clientCount++;
     });
     
-    return Array.from(stats.values()).map(stat => ({
-      ...stat,
-      conversionRate: stat.totalNew > 0 ? (stat.totalConverted / stat.totalNew) * 100 : 0,
-      retentionRate: stat.totalConverted > 0 ? (stat.totalRetained / stat.totalConverted) * 100 : 0,
-      classAverage: stat.totalNonEmptySessions > 0 ? stat.totalCustomers / stat.totalNonEmptySessions : 0,
-      avgLTV: stat.clientCount > 0 ? stat.totalLTV / stat.clientCount : 0,
-      emptyClassRate: stat.totalSessions > 0 ? (stat.totalEmptySessions / stat.totalSessions) * 100 : 0
-    })).filter(stat => stat.totalSessions > 0); // Only include trainers with sessions
+    return Array.from(stats.values()).map(stat => {
+      const conversionRate = stat.totalNew > 0 ? (stat.totalConverted / stat.totalNew) * 100 : 0;
+      const retentionRate = stat.totalNew > 0 ? (stat.totalRetained / stat.totalNew) * 100 : 0;
+      const classAverage = stat.totalNonEmptySessions > 0 ? stat.totalCustomers / stat.totalNonEmptySessions : 0;
+      const avgLTV = stat.clientCount > 0 ? stat.totalLTV / stat.clientCount : 0;
+      const emptyClassRate = stat.totalSessions > 0 ? (stat.totalEmptySessions / stat.totalSessions) * 100 : 0;
+      
+      // Debug logging for trainers
+      if (stat.name && stat.totalSessions > 0) {
+        console.log(`Trainer ${stat.name}:`, {
+          totalSessions: stat.totalSessions,
+          totalEmptySessions: stat.totalEmptySessions,
+          totalCustomers: stat.totalCustomers,
+          totalNew: stat.totalNew,
+          totalConverted: stat.totalConverted,
+          conversionRate,
+          classAverage,
+          emptyClassRate
+        });
+      }
+      
+      return {
+        ...stat,
+        conversionRate,
+        retentionRate,
+        classAverage,
+        avgLTV,
+        emptyClassRate,
+        totalClients: stat.clientCount // Add this for consistency
+      };
+    }).filter(stat => stat.totalSessions > 0); // Only include trainers who actually taught classes
   }, [data, payrollData]);
 
-  // Calculate location stats using both datasets
+  // Calculate location stats using both data sources
   const locationStats = React.useMemo(() => {
-    if (!payrollData || payrollData.length === 0) return [];
-    
     const stats = new Map();
     
-    // Get base stats from payroll data
+    // Initialize stats from payroll data
     payrollData.forEach(payroll => {
       const location = payroll.location;
-      if (!location) return;
+      if (!location || location === 'Unknown') return;
       
       if (!stats.has(location)) {
         stats.set(location, {
@@ -119,28 +154,37 @@ export const ClientConversionSimplifiedRanks: React.FC<ClientConversionSimplifie
       locationStat.totalRetained += payroll.retained || 0;
       locationStat.totalNew += payroll.new || 0;
     });
-    
-    // Add client data for LTV calculations
+
+    // Add client data for LTV
     data.forEach(client => {
       const location = client.firstVisitLocation || client.homeLocation;
-      if (!location || !stats.has(location)) return;
+      if (!location || location === 'Unknown' || !stats.has(location)) return;
       
       const locationStat = stats.get(location);
       locationStat.totalLTV += client.ltv || 0;
       locationStat.clientCount++;
     });
     
-    return Array.from(stats.values()).map(stat => ({
-      ...stat,
-      conversionRate: stat.totalNew > 0 ? (stat.totalConverted / stat.totalNew) * 100 : 0,
-      retentionRate: stat.totalConverted > 0 ? (stat.totalRetained / stat.totalConverted) * 100 : 0,
-      classAverage: stat.totalNonEmptySessions > 0 ? stat.totalCustomers / stat.totalNonEmptySessions : 0,
-      avgLTV: stat.clientCount > 0 ? stat.totalLTV / stat.clientCount : 0,
-      emptyClassRate: stat.totalSessions > 0 ? (stat.totalEmptySessions / stat.totalSessions) * 100 : 0
-    })).filter(stat => stat.totalSessions > 0);
+    return Array.from(stats.values()).map(stat => {
+      const conversionRate = stat.totalNew > 0 ? (stat.totalConverted / stat.totalNew) * 100 : 0;
+      const retentionRate = stat.totalNew > 0 ? (stat.totalRetained / stat.totalNew) * 100 : 0;
+      const classAverage = stat.totalNonEmptySessions > 0 ? stat.totalCustomers / stat.totalNonEmptySessions : 0;
+      const avgLTV = stat.clientCount > 0 ? stat.totalLTV / stat.clientCount : 0;
+      const emptyClassRate = stat.totalSessions > 0 ? (stat.totalEmptySessions / stat.totalSessions) * 100 : 0;
+      
+      return {
+        ...stat,
+        conversionRate,
+        retentionRate,
+        classAverage,
+        avgLTV,
+        emptyClassRate,
+        totalClients: stat.clientCount // Add this for consistency
+      };
+    }).filter(stat => stat.totalSessions > 0);
   }, [data, payrollData]);
 
-  // Calculate membership stats from client data only
+  // Calculate membership stats (client-data only since payroll doesn't track memberships)
   const membershipStats = React.useMemo(() => {
     const stats = new Map();
     
@@ -153,50 +197,64 @@ export const ClientConversionSimplifiedRanks: React.FC<ClientConversionSimplifie
           newMembers: 0,
           converted: 0,
           retained: 0,
-          totalLTV: 0
+          totalLTV: 0,
+          avgVisits: 0
         });
       }
       
       const membershipStat = stats.get(membership);
       membershipStat.totalClients++;
       membershipStat.totalLTV += client.ltv || 0;
+      membershipStat.avgVisits += client.visitsPostTrial || 0;
       
-      if (String(client.isNew || '').includes('New')) {
+      // Use more robust status detection
+      const isNewValue = (client.isNew || '').toLowerCase();
+      if (isNewValue.includes('new') || isNewValue === 'yes') {
         membershipStat.newMembers++;
       }
-      if (client.conversionStatus === 'Converted') {
+      
+      const conversionStatus = (client.conversionStatus || '').toLowerCase();
+      if (conversionStatus.includes('converted') || conversionStatus === 'yes') {
         membershipStat.converted++;
       }
-      if (client.retentionStatus === 'Retained') {
+      
+      const retentionStatus = (client.retentionStatus || '').toLowerCase();
+      if (retentionStatus.includes('retained') || retentionStatus === 'yes') {
         membershipStat.retained++;
       }
     });
     
-    return Array.from(stats.values()).map(stat => ({
-      ...stat,
-      conversionRate: stat.newMembers > 0 ? (stat.converted / stat.newMembers) * 100 : 0,
-      retentionRate: stat.converted > 0 ? (stat.retained / stat.converted) * 100 : 0,
-      avgLTV: stat.totalClients > 0 ? stat.totalLTV / stat.totalClients : 0
-    })).filter(stat => stat.totalClients > 0);
+    return Array.from(stats.values()).map(stat => {
+      const conversionRate = stat.newMembers > 0 ? (stat.converted / stat.newMembers) * 100 : 0;
+      const retentionRate = stat.newMembers > 0 ? (stat.retained / stat.newMembers) * 100 : 0;
+      const avgLTV = stat.totalClients > 0 ? stat.totalLTV / stat.totalClients : 0;
+      const avgVisitsPerClient = stat.totalClients > 0 ? stat.avgVisits / stat.totalClients : 0;
+      
+      return {
+        ...stat,
+        conversionRate,
+        retentionRate,
+        avgLTV,
+        avgVisitsPerClient
+      };
+    }).filter(stat => stat.totalClients >= 5); // Only include memberships with meaningful sample size
   }, [data]);
 
-  // Simplified ranking options - only the most important metrics
   const rankingOptions = [
-    // Trainer Rankings
+    // Trainers - focus on key metrics
     { id: 'trainer-conversion', label: 'Trainer Conversion Rate', icon: Trophy, type: 'trainer', metric: 'conversionRate' },
     { id: 'trainer-classes', label: 'Classes Taught', icon: Calendar, type: 'trainer', metric: 'totalSessions' },
-    { id: 'trainer-average', label: 'Class Average', icon: BarChart3, type: 'trainer', metric: 'classAverage' },
-    { id: 'trainer-empty', label: 'Empty Classes', icon: XCircle, type: 'trainer', metric: 'emptyClassRate' },
+    { id: 'trainer-average', label: 'Class Average', icon: Users, type: 'trainer', metric: 'classAverage' },
+    { id: 'trainer-empty', label: 'Empty Classes %', icon: AlertTriangle, type: 'trainer', metric: 'emptyClassRate' },
     
-    // Location Rankings
-    { id: 'location-conversion', label: 'Location Conversion Rate', icon: MapPin, type: 'location', metric: 'conversionRate' },
-    { id: 'location-classes', label: 'Total Sessions', icon: Calendar, type: 'location', metric: 'totalSessions' },
-    { id: 'location-average', label: 'Class Average', icon: BarChart3, type: 'location', metric: 'classAverage' },
-    { id: 'location-empty', label: 'Empty Classes', icon: XCircle, type: 'location', metric: 'emptyClassRate' },
+    // Locations
+    { id: 'location-conversion', label: 'Location Conversion', icon: MapPin, type: 'location', metric: 'conversionRate' },
+    { id: 'location-classes', label: 'Location Classes', icon: Calendar, type: 'location', metric: 'totalSessions' },
+    { id: 'location-average', label: 'Location Class Average', icon: Users, type: 'location', metric: 'classAverage' },
     
-    // Membership Rankings
-    { id: 'membership-conversion', label: 'Membership Conversion', icon: Target, type: 'membership', metric: 'conversionRate' },
-    { id: 'membership-ltv', label: 'Membership LTV', icon: DollarSign, type: 'membership', metric: 'avgLTV' }
+    // Memberships
+    { id: 'membership-conversion', label: 'Membership Conversion', icon: Crown, type: 'membership', metric: 'conversionRate' },
+    { id: 'membership-ltv', label: 'Membership LTV', icon: DollarSign, type: 'membership', metric: 'avgLTV' },
   ];
 
   const getCurrentData = () => {
@@ -218,108 +276,171 @@ export const ClientConversionSimplifiedRanks: React.FC<ClientConversionSimplifie
         sourceData = trainerStats;
     }
 
-    // Filter out entries with insufficient data
-    const minThreshold = option.type === 'membership' ? 5 : 3;
+    // Filter out items with insufficient data
+    const minThreshold = option.type === 'trainer' ? 3 : 1;
     const filtered = sourceData.filter(item => {
-      if (option.type === 'membership') {
-        return item.totalClients >= minThreshold;
+      if (option.metric === 'totalSessions' || option.metric === 'classAverage' || option.metric === 'emptyClassRate') {
+        return item.totalSessions >= 5; // Require at least 5 sessions for meaningful class metrics
       }
-      return (item.totalSessions || 0) >= minThreshold;
+      if (option.metric === 'conversionRate' || option.metric === 'retentionRate') {
+        return item.totalNew >= minThreshold; // Require new members for conversion metrics
+      }
+      return item.totalClients >= 1 || item.clientCount >= 1;
     });
     
     const sorted = [...filtered].sort((a, b) => {
-      // For empty class rate, we want ascending order (lower is better)
-      if (option.metric === 'emptyClassRate') {
-        return a[option.metric] - b[option.metric];
-      }
-      return b[option.metric] - a[option.metric];
+      const aValue = a[option.metric] || 0;
+      const bValue = b[option.metric] || 0;
+      return bValue - aValue;
     });
     
     return {
       top: sorted.slice(0, 5),
-      bottom: option.metric === 'emptyClassRate' ? sorted.slice(-5).reverse() : sorted.slice(-5).reverse()
+      bottom: sorted.slice(-5).reverse()
     };
   };
-
-  if (payrollLoading) {
-    return <div className="flex items-center justify-center p-8">Loading payroll data...</div>;
-  }
 
   const { top, bottom } = getCurrentData();
   const currentOption = rankingOptions.find(r => r.id === selectedRanking);
 
   const formatValue = (value: number, metric: string) => {
     if (metric === 'avgLTV') return formatCurrency(value);
-    if (metric === 'totalSessions' || metric === 'classAverage') return value.toFixed(1);
+    if (metric === 'totalSessions') return formatNumber(value);
+    if (metric === 'totalClients' || metric === 'clientCount') return formatNumber(value);
+    if (metric === 'classAverage') return value.toFixed(1);
+    if (metric === 'avgVisitsPerClient') return value.toFixed(1);
     return `${value.toFixed(1)}%`;
   };
 
-  const getSecondaryMetric = (item: any, type: string) => {
-    if (type === 'trainer' || type === 'location') {
-      return `${item.totalSessions || 0} sessions • ${(item.emptyClassRate || 0).toFixed(1)}% empty`;
-    }
-    return `${item.totalClients || 0} clients`;
-  };
-
   const RankCard = ({ title, data: rankData, isTop = true }) => (
-    <Card className="group bg-white shadow-lg border-0 overflow-hidden hover:shadow-2xl transition-all duration-500 hover:scale-105">
-      <CardHeader className={`bg-gradient-to-r ${
-        isTop 
-          ? 'from-emerald-500 to-teal-600' 
-          : 'from-orange-500 to-red-600'
-      } text-white relative overflow-hidden`}>
-        <div className="absolute top-0 right-0 w-20 h-20 transform translate-x-8 -translate-y-8 opacity-20">
-          {isTop ? <Crown className="w-20 h-20" /> : <AlertTriangle className="w-20 h-20" />}
-        </div>
-        <CardTitle className="flex items-center gap-3 relative z-10">
-          {isTop ? <Crown className="w-6 h-6" /> : <AlertTriangle className="w-6 h-6" />}
-          <div>
-            <h3 className="text-lg font-bold">{title}</h3>
-            <p className="text-sm opacity-90 font-normal">
-              {isTop ? 'Top performers' : 'Needs attention'}
-            </p>
-          </div>
+    <Card className="bg-gradient-to-br from-white via-slate-50/50 to-white border-0 shadow-xl hover:shadow-2xl transition-all duration-500">
+      <CardHeader className="pb-4">
+        <CardTitle className="flex items-center gap-3 text-xl">
+          {isTop ? (
+            <>
+              <div className="p-2 rounded-full bg-gradient-to-r from-yellow-400 to-orange-500">
+                <Crown className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <span className="bg-gradient-to-r from-yellow-600 to-orange-600 bg-clip-text text-transparent">
+                  {title}
+                </span>
+                <p className="text-sm text-slate-600 font-normal">Top performers</p>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="p-2 rounded-full bg-gradient-to-r from-red-400 to-rose-500">
+                <AlertTriangle className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <span className="bg-gradient-to-r from-red-600 to-rose-600 bg-clip-text text-transparent">
+                  {title}
+                </span>
+                <p className="text-sm text-slate-600 font-normal">Areas for improvement</p>
+              </div>
+            </>
+          )}
         </CardTitle>
       </CardHeader>
-      <CardContent className="p-6 space-y-4">
+      <CardContent className="space-y-4">
         {rankData.map((item, index) => (
           <div 
             key={item.name} 
-            className="flex items-center justify-between p-4 bg-gradient-to-r from-slate-50 to-slate-100 rounded-xl hover:from-slate-100 hover:to-slate-200 transition-all duration-300 group-hover:scale-105"
+            className="group flex items-center justify-between p-4 rounded-xl bg-white shadow-sm border hover:shadow-md transition-all duration-300 cursor-pointer"
+            onClick={() => {
+              if (onDrillDown && currentOption) {
+                const drillDownType = currentOption.type === 'trainer' ? 'trainer' : 
+                                    currentOption.type === 'location' ? 'location' : 'membership';
+                onDrillDown(drillDownType, item, currentOption.metric);
+              }
+            }}
           >
-            <div className="flex items-center gap-4">
-              <div className={`flex items-center justify-center w-10 h-10 rounded-full font-bold text-sm transition-all duration-300 ${
-                index === 0 && isTop ? 'bg-gradient-to-r from-yellow-400 to-yellow-600 text-white shadow-lg' :
-                index === 1 && isTop ? 'bg-gradient-to-r from-gray-300 to-gray-500 text-white shadow-lg' :
-                index === 2 && isTop ? 'bg-gradient-to-r from-orange-400 to-orange-600 text-white shadow-lg' :
-                'bg-gradient-to-r from-slate-200 to-slate-300 text-slate-600'
-              }`}>
+            <div className="flex items-center gap-4 flex-1">
+              <div className={cn(
+                "w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold shadow-sm",
+                isTop 
+                  ? 'bg-gradient-to-r from-green-400 to-emerald-600 text-white'
+                  : 'bg-gradient-to-r from-red-400 to-rose-600 text-white'
+              )}>
                 {index + 1}
               </div>
-              <div>
-                <p className="font-bold text-slate-900 truncate max-w-[200px]" title={item.name}>
+              <div className="flex-1">
+                <p className="font-semibold text-slate-900 whitespace-normal break-words group-hover:text-blue-600 transition-colors">
                   {item.name}
                 </p>
-                <p className="text-sm text-slate-500">
-                  {getSecondaryMetric(item, currentOption?.type || 'trainer')}
-                </p>
+                <div className="flex flex-wrap gap-2 mt-2">
+                  <Badge variant="secondary" className="text-xs bg-blue-50 text-blue-700 border-blue-200">
+                    {formatNumber(item.totalClients || item.clientCount || 0)} clients
+                  </Badge>
+                  {currentOption?.type === 'trainer' && (
+                    <>
+                      <Badge variant="outline" className="text-xs border-purple-200 text-purple-700">
+                        {formatNumber(item.totalSessions || 0)} classes
+                      </Badge>
+                      <Badge variant="outline" className="text-xs border-green-200 text-green-700">
+                        Avg: {(item.classAverage || 0).toFixed(1)}
+                      </Badge>
+                      <Badge variant="outline" className="text-xs border-orange-200 text-orange-700">
+                        Empty: {(item.emptyClassRate || 0).toFixed(1)}%
+                      </Badge>
+                    </>
+                  )}
+                  {currentOption?.type === 'location' && (
+                    <>
+                      <Badge variant="outline" className="text-xs border-purple-200 text-purple-700">
+                        {formatNumber(item.totalSessions || 0)} classes
+                      </Badge>
+                      <Badge variant="outline" className="text-xs border-green-200 text-green-700">
+                        Avg: {(item.classAverage || 0).toFixed(1)}
+                      </Badge>
+                    </>
+                  )}
+                  {currentOption?.type === 'membership' && (
+                    <>
+                      <Badge variant="outline" className="text-xs border-green-200 text-green-700">
+                        LTV: {formatCurrency(item.avgLTV || 0)}
+                      </Badge>
+                      <Badge variant="outline" className="text-xs border-orange-200 text-orange-700">
+                        Visits: {(item.avgVisitsPerClient || 0).toFixed(1)}
+                      </Badge>
+                    </>
+                  )}
+                </div>
               </div>
             </div>
             <div className="text-right">
-              <Badge 
-                className={`font-bold text-sm px-3 py-1 ${
-                  isTop 
-                    ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' 
-                    : 'bg-orange-100 text-orange-800 border border-orange-200'
-                }`}
-              >
+              <p className="font-bold text-xl text-slate-900 group-hover:text-blue-600 transition-colors">
                 {formatValue(item[currentOption?.metric || 'conversionRate'], currentOption?.metric || 'conversionRate')}
-              </Badge>
-              {(currentOption?.type === 'trainer' || currentOption?.type === 'location') && (
-                <p className="text-xs text-slate-500 mt-1">
-                  {item.classAverage?.toFixed(1)} avg
-                </p>
-              )}
+              </p>
+              <p className="text-sm text-slate-500">
+                {currentOption?.metric === 'totalSessions' ? 'Total Classes' :
+                 currentOption?.metric === 'classAverage' ? 'Class Average' :
+                 currentOption?.metric === 'emptyClassRate' ? 'Empty Rate' :
+                 currentOption?.metric === 'avgLTV' ? 'Avg LTV' :
+                 'Conversion Rate'}
+              </p>
+              <p className="text-xs text-slate-400">
+                {currentOption?.type === 'trainer' ? 'Trainer Performance' :
+                 currentOption?.type === 'location' ? 'Location Performance' :
+                 'Membership Performance'}
+              </p>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="mt-1 opacity-0 group-hover:opacity-100 transition-all duration-300 hover:bg-blue-50 hover:text-blue-600 hover:shadow-sm"
+                onClick={e => {
+                  e.stopPropagation();
+                  if (onDrillDown && currentOption) {
+                    const drillDownType = currentOption.type === 'trainer' ? 'trainer' : 
+                                        currentOption.type === 'location' ? 'location' : 'membership';
+                    onDrillDown(drillDownType, item, currentOption.metric);
+                  }
+                }}
+              >
+                <Eye className="w-3 h-3 mr-1" />
+                View Analytics
+              </Button>
             </div>
           </div>
         ))}
@@ -335,13 +456,10 @@ export const ClientConversionSimplifiedRanks: React.FC<ClientConversionSimplifie
           <CardTitle className="flex items-center gap-3 text-slate-800">
             <Trophy className="w-6 h-6 text-yellow-600" />
             Performance Rankings
-            <span className="text-sm font-normal text-slate-500 ml-2">
-              Based on New Client and Payroll data
-            </span>
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3">
             {rankingOptions.map((option) => (
               <Button
                 key={option.id}
@@ -367,13 +485,13 @@ export const ClientConversionSimplifiedRanks: React.FC<ClientConversionSimplifie
       {/* Top and Bottom Rankings */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <RankCard
-          title={`Best ${currentOption?.label || 'Performance'}`}
+          title={`Top ${currentOption?.label || 'Performance'}`}
           data={top}
           isTop={true}
         />
         
         <RankCard
-          title={`${currentOption?.metric === 'emptyClassRate' ? 'Most' : 'Lowest'} ${currentOption?.label || 'Performance'}`}
+          title={`Bottom ${currentOption?.label || 'Performance'}`}
           data={bottom}
           isTop={false}
         />

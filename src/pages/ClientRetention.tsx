@@ -47,6 +47,7 @@ const ClientRetention = () => {
   const navigate = useNavigate();
   const [selectedLocation, setSelectedLocation] = useState('All Locations');
   const [activeTable, setActiveTable] = useState('monthonmonthbytype');
+  const [selectedMetric, setSelectedMetric] = useState('conversion'); // New state for metric selection
   const [drillDownModal, setDrillDownModal] = useState({
     isOpen: false,
     client: null,
@@ -75,19 +76,22 @@ const ClientRetention = () => {
     setLoading(loading || sessionsLoading || payrollLoading, 'Analyzing client conversion and retention patterns...');
   }, [loading, sessionsLoading, payrollLoading, setLoading]);
 
-  // Create visits summary from payroll data (sum of totalCustomers by month/year and location)
-  const visitsSummary = useMemo(() => {
-    if (!payrollData || payrollData.length === 0) return {};
+  // Create comprehensive filtered payroll data matching all applied filters
+  const filteredPayrollData = useMemo(() => {
+    if (!payrollData || payrollData.length === 0) return [];
     
-    // Filter payroll data by selected location
-    let filteredPayroll = payrollData;
+    let filtered = payrollData;
+    
+    // Apply location filter
     if (selectedLocation !== 'All Locations') {
-      filteredPayroll = payrollData.filter(payroll => {
+      filtered = filtered.filter(payroll => {
         const payrollLocation = payroll.location || '';
         
         // For Kenkere House, use flexible matching
         if (selectedLocation === 'Kenkere House, Bengaluru') {
-          return payrollLocation.toLowerCase().includes('kenkere') || payrollLocation.toLowerCase().includes('bengaluru');
+          return payrollLocation.toLowerCase().includes('kenkere') || 
+                 payrollLocation.toLowerCase().includes('bengaluru') || 
+                 payrollLocation === 'Kenkere House';
         }
         
         // For other locations, use exact match
@@ -95,8 +99,46 @@ const ClientRetention = () => {
       });
     }
     
+    // Apply date range filter to payroll data using monthYear field
+    if (filters.dateRange.start && filters.dateRange.end) {
+      const startDate = new Date(filters.dateRange.start + 'T00:00:00');
+      const endDate = new Date(filters.dateRange.end + 'T23:59:59');
+      
+      filtered = filtered.filter(payroll => {
+        if (!payroll.monthYear) return false;
+        
+        // Parse monthYear (format: "Jan 2024" or "2024-01")
+        let payrollDate: Date;
+        if (payroll.monthYear.includes('-')) {
+          // Format: "2024-01"
+          payrollDate = new Date(payroll.monthYear + '-01');
+        } else {
+          // Format: "Jan 2024"
+          payrollDate = new Date(payroll.monthYear + ' 01');
+        }
+        
+        if (isNaN(payrollDate.getTime())) return false;
+        
+        // Check if payroll month falls within the selected date range
+        return payrollDate >= startDate && payrollDate <= endDate;
+      });
+    }
+    
+    // Apply trainer filter if specified
+    if (filters.trainer.length > 0) {
+      filtered = filtered.filter(payroll => filters.trainer.includes(payroll.teacherName || ''));
+    }
+    
+    console.log(`Filtered payroll data: ${payrollData.length} -> ${filtered.length} records`);
+    return filtered;
+  }, [payrollData, selectedLocation, filters]);
+
+  // Create visits summary from filtered payroll data
+  const visitsSummary = useMemo(() => {
+    if (!filteredPayrollData || filteredPayrollData.length === 0) return {};
+    
     const summary: Record<string, number> = {};
-    filteredPayroll.forEach(payroll => {
+    filteredPayrollData.forEach(payroll => {
       if (payroll.monthYear && payroll.totalCustomers) {
         // Use monthYear directly as key (should be in format like "Jan 2024")
         const key = payroll.monthYear;
@@ -104,9 +146,9 @@ const ClientRetention = () => {
       }
     });
     
-    console.log('Visits summary for location', selectedLocation, ':', summary);
+    console.log('Visits summary for filtered data:', summary);
     return summary;
-  }, [payrollData, selectedLocation]);
+  }, [filteredPayrollData]);
 
   // Get unique values for filters (only 3 main locations)
   const uniqueLocations = React.useMemo(() => {
@@ -460,7 +502,58 @@ const ClientRetention = () => {
 
           {/* Enhanced Simplified Ranking System */}
           <div className="glass-card modern-card-hover rounded-2xl p-6 slide-in-right stagger-3">
-            <ClientConversionSimplifiedRanks data={filteredData} />
+            <ClientConversionSimplifiedRanks 
+              data={filteredData} 
+              payrollData={filteredPayrollData}
+              allPayrollData={payrollData}
+              allClientData={data}
+              selectedLocation={selectedLocation}
+              dateRange={filters.dateRange}
+              selectedMetric={selectedMetric}
+              onDrillDown={(type, item, metric) => {
+                // Enhanced filtering with debugging
+                const relatedClients = filteredData.filter(client => {
+                  let match = false;
+                  if (type === 'trainer') {
+                    match = client.trainerName === item.name;
+                  } else if (type === 'location') {
+                    match = client.firstVisitLocation === item.name || client.homeLocation === item.name;
+                  } else if (type === 'membership') {
+                    match = client.membershipUsed === item.name;
+                  }
+                  return match;
+                });
+
+                const relatedPayroll = filteredPayrollData.filter(payroll => {
+                  if (type === 'trainer') return payroll.teacherName === item.name;
+                  if (type === 'location') return payroll.location === item.name;
+                  return false;
+                });
+
+                // Debug logging - simplified
+                console.log('✅ Drill Down Initiated:', {
+                  type,
+                  itemName: item.name,
+                  metric,
+                  relatedClientsCount: relatedClients.length,
+                  relatedPayrollCount: relatedPayroll.length
+                });
+
+                setDrillDownModal({
+                  isOpen: true,
+                  client: null,
+                  title: `${item.name} - ${metric} Analysis`,
+                  data: {
+                    type,
+                    item,
+                    metric,
+                    relatedClients,
+                    relatedPayroll
+                  },
+                  type: 'ranking'
+                });
+              }}
+            />
           </div>
 
           {/* Enhanced Interactive Charts - Collapsed by default */}

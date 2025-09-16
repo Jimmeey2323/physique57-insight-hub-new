@@ -13,7 +13,7 @@ interface ClientConversionDrillDownModalV3Props {
   onClose: () => void;
   title: string;
   data: any;
-  type: 'month' | 'year' | 'class' | 'membership' | 'metric';
+  type: 'month' | 'year' | 'class' | 'membership' | 'metric' | 'ranking';
 }
 export const ClientConversionDrillDownModalV3: React.FC<ClientConversionDrillDownModalV3Props> = ({
   isOpen,
@@ -28,51 +28,89 @@ export const ClientConversionDrillDownModalV3: React.FC<ClientConversionDrillDow
   const clients: NewClientData[] = React.useMemo(() => {
     if (!data) return [];
 
+    // For ranking drill-downs, use the relatedClients array
+    if (type === 'ranking' && data.relatedClients) {
+      console.log('Drill-down V3: Using ranking related clients:', data.relatedClients.length);
+      return data.relatedClients;
+    }
+
     // For metric card clicks, use the filtered clients array
     if (type === 'metric' && data.clients) {
       console.log('Drill-down V3: Using metric card filtered clients:', data.clients.length);
       return data.clients;
     }
 
-    // For month/year type, use the specific clients from the clicked row
+    // For month/year table row clicks, use the clients array from the row data
     if ((type === 'month' || type === 'year') && data.clients) {
-      console.log('Drill-down V3: Using targeted clients from clicked row:', data.clients.length);
+      console.log('Drill-down V3: Using table row clients:', data.clients.length);
       return data.clients;
     }
 
-    // For other types, ensure we return the array format
+    // For other table types, check if data has clients property
+    if (data.clients && Array.isArray(data.clients)) {
+      console.log('Drill-down V3: Using generic clients array:', data.clients.length);
+      return data.clients;
+    }
+
+    // For direct array format
     if (Array.isArray(data)) {
+      console.log('Drill-down V3: Using direct array data:', data.length);
       return data;
     }
 
     // Fallback to empty array
-    console.log('Drill-down V3: No targeted clients found, showing empty');
+    console.log('Drill-down V3: No targeted clients found, showing empty. Data structure:', Object.keys(data || {}));
     return [];
   }, [data, type]);
 
   // Calculate summary metrics from targeted clients
   const summary = React.useMemo(() => {
     const totalMembers = clients.length;
-    const newMembers = clients.filter(c => (c.isNew || '').toLowerCase().includes('new')).length;
-    const convertedMembers = clients.filter(c => (c.conversionStatus || '').toLowerCase().includes('converted')).length;
-    const retainedMembers = clients.filter(c => (c.retentionStatus || '').toLowerCase().includes('retained')).length;
+    
+    // New members: those with isNew containing "New" but not "Not New" and not "Repeat Visit" and not "Not Attended"
+    const newMembers = clients.filter(c => {
+      const isNewValue = (c.isNew || '').trim();
+      return isNewValue.includes('New') && 
+             !isNewValue.includes('Not New') && 
+             !isNewValue.includes('Repeat Visit') && 
+             !isNewValue.includes('Not Attended');
+    }).length;
+    
+    // Converted members: those with exact conversionStatus "Converted"
+    const convertedMembers = clients.filter(c => (c.conversionStatus || '').trim() === 'Converted').length;
+    
+    // Retained members: those with exact retentionStatus "Retained"
+    const retainedMembers = clients.filter(c => (c.retentionStatus || '').trim() === 'Retained').length;
+    
     const totalLTV = clients.reduce((sum, c) => sum + (c.ltv || 0), 0);
     const totalConversionSpan = clients.filter(c => c.conversionSpan > 0).reduce((sum, c) => sum + (c.conversionSpan || 0), 0);
     const clientsWithConversionData = clients.filter(c => c.conversionSpan > 0).length;
+    
+    // Debug logging to understand the data
+    console.log('Modal Summary Calculation:', {
+      totalMembers,
+      newMembers,
+      convertedMembers,
+      retainedMembers,
+      sampleIsNewValues: clients.slice(0, 5).map(c => c.isNew),
+      sampleConversionStatus: clients.slice(0, 5).map(c => c.conversionStatus),
+      sampleRetentionStatus: clients.slice(0, 5).map(c => c.retentionStatus)
+    });
+    
     return {
       totalMembers,
       newMembers,
       convertedMembers,
       retainedMembers,
-      conversionRate: newMembers > 0 ? convertedMembers / newMembers * 100 : 0,
-      retentionRate: totalMembers > 0 ? retainedMembers / totalMembers * 100 : 0,
+      conversionRate: newMembers > 0 ? (convertedMembers / newMembers) * 100 : 0,
+      retentionRate: newMembers > 0 ? (retainedMembers / newMembers) * 100 : 0,
       avgLTV: totalMembers > 0 ? totalLTV / totalMembers : 0,
       totalLTV,
       avgConversionTime: clientsWithConversionData > 0 ? totalConversionSpan / clientsWithConversionData : 0
     };
   }, [clients]);
   const renderMetricCards = () => {
-    return <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+    return <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
         <Card className="bg-gradient-to-br from-blue-500 to-blue-600 text-white border-0 shadow-lg">
           <CardContent className="p-4">
             <div className="flex items-center justify-between mb-2">
@@ -92,6 +130,17 @@ export const ClientConversionDrillDownModalV3: React.FC<ClientConversionDrillDow
             </div>
             <div className="text-2xl font-bold">{formatNumber(summary.newMembers)}</div>
             <div className="text-green-100 text-sm">New Members</div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-gradient-to-br from-teal-500 to-teal-600 text-white border-0 shadow-lg">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between mb-2">
+              <Star className="w-5 h-5 text-teal-100" />
+              <Badge className="bg-white/20 text-white border-0">Conv</Badge>
+            </div>
+            <div className="text-2xl font-bold">{formatNumber(summary.convertedMembers)}</div>
+            <div className="text-teal-100 text-sm">Converted</div>
           </CardContent>
         </Card>
 
