@@ -67,13 +67,10 @@ export const ClientConversionDrillDownModalV3: React.FC<ClientConversionDrillDow
   const summary = React.useMemo(() => {
     const totalMembers = clients.length;
     
-    // New members: those with isNew containing "New" but not "Not New" and not "Repeat Visit" and not "Not Attended"
+    // New members: match the exact logic from metric cards - where isNew contains "new" (case insensitive)
     const newMembers = clients.filter(c => {
-      const isNewValue = (c.isNew || '').trim();
-      return isNewValue.includes('New') && 
-             !isNewValue.includes('Not New') && 
-             !isNewValue.includes('Repeat Visit') && 
-             !isNewValue.includes('Not Attended');
+      const isNewValue = String(c.isNew || '').toLowerCase();
+      return isNewValue.includes('new');
     }).length;
     
     // Converted members: those with exact conversionStatus "Converted"
@@ -87,14 +84,18 @@ export const ClientConversionDrillDownModalV3: React.FC<ClientConversionDrillDow
     const clientsWithConversionData = clients.filter(c => c.conversionSpan > 0).length;
     
     // Debug logging to understand the data
-    console.log('Modal Summary Calculation:', {
+    console.log('Modal Summary Calculation (Updated Logic):', {
       totalMembers,
       newMembers,
       convertedMembers,
       retainedMembers,
       sampleIsNewValues: clients.slice(0, 5).map(c => c.isNew),
       sampleConversionStatus: clients.slice(0, 5).map(c => c.conversionStatus),
-      sampleRetentionStatus: clients.slice(0, 5).map(c => c.retentionStatus)
+      sampleRetentionStatus: clients.slice(0, 5).map(c => c.retentionStatus),
+      filteredNewMembersCheck: clients.filter(c => {
+        const isNewValue = String(c.isNew || '').toLowerCase();
+        return isNewValue.includes('new');
+      }).length
     });
     
     return {
