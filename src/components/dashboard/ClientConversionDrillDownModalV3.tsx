@@ -36,7 +36,7 @@ export const ClientConversionDrillDownModalV3: React.FC<ClientConversionDrillDow
 
     // For metric card clicks, use the filtered clients array
     if (type === 'metric' && data.clients) {
-      console.log('Drill-down V3: Using metric card filtered clients:', data.clients.length);
+      console.log('Drill-down V3: Using metric card filtered clients:', data.clients.length, 'MetricType:', data.metricType);
       return data.clients;
     }
 
@@ -89,6 +89,7 @@ export const ClientConversionDrillDownModalV3: React.FC<ClientConversionDrillDow
       newMembers,
       convertedMembers,
       retainedMembers,
+      metricType: data?.metricType,
       sampleIsNewValues: clients.slice(0, 5).map(c => c.isNew),
       sampleConversionStatus: clients.slice(0, 5).map(c => c.conversionStatus),
       sampleRetentionStatus: clients.slice(0, 5).map(c => c.retentionStatus),
@@ -103,14 +104,35 @@ export const ClientConversionDrillDownModalV3: React.FC<ClientConversionDrillDow
       newMembers,
       convertedMembers,
       retainedMembers,
-      conversionRate: newMembers > 0 ? (convertedMembers / newMembers) * 100 : 0,
-      retentionRate: newMembers > 0 ? (retainedMembers / newMembers) * 100 : 0,
+      conversionRate: totalMembers > 0 ? (convertedMembers / totalMembers) * 100 : 0, // Conversion rate within this subset
+      retentionRate: totalMembers > 0 ? (retainedMembers / totalMembers) * 100 : 0, // Retention rate within this subset
       avgLTV: totalMembers > 0 ? totalLTV / totalMembers : 0,
       totalLTV,
       avgConversionTime: clientsWithConversionData > 0 ? totalConversionSpan / clientsWithConversionData : 0
     };
   }, [clients]);
   const renderMetricCards = () => {
+    // Determine labels based on drill-down context
+    const metricType = data?.metricType || '';
+    const isConvertedDrillDown = metricType === 'converted_members';
+    const isRetainedDrillDown = metricType === 'retained_members';
+    const isNewMembersDrillDown = metricType === 'new_members';
+    
+    // Contextual labels for better understanding
+    const newMembersLabel = isConvertedDrillDown ? 'New → Converted' : 
+                           isRetainedDrillDown ? 'New → Retained' : 
+                           'New Members';
+    const newMembersDescription = isConvertedDrillDown ? 'New members who converted' : 
+                                 isRetainedDrillDown ? 'New members who were retained' : 
+                                 'New Members';
+    
+    const conversionRateLabel = isConvertedDrillDown ? 'Subset Conv. Rate' :
+                               isRetainedDrillDown ? 'Subset Conv. Rate' :
+                               'Conversion Rate';
+    const conversionRateDescription = isConvertedDrillDown ? 'Converted from this subset' :
+                                     isRetainedDrillDown ? 'Converted from this subset' :
+                                     'Overall conversion rate';
+
     return <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
         <Card className="bg-gradient-to-br from-blue-500 to-blue-600 text-white border-0 shadow-lg">
           <CardContent className="p-4">
@@ -130,7 +152,8 @@ export const ClientConversionDrillDownModalV3: React.FC<ClientConversionDrillDow
               <Badge className="bg-white/20 text-white border-0">New</Badge>
             </div>
             <div className="text-2xl font-bold">{formatNumber(summary.newMembers)}</div>
-            <div className="text-green-100 text-sm">New Members</div>
+            <div className="text-green-100 text-sm">{newMembersLabel}</div>
+            <div className="text-green-100 text-xs mt-1 opacity-80">{newMembersDescription}</div>
           </CardContent>
         </Card>
 
@@ -152,7 +175,8 @@ export const ClientConversionDrillDownModalV3: React.FC<ClientConversionDrillDow
               <Badge className="bg-white/20 text-white border-0">Rate</Badge>
             </div>
             <div className="text-2xl font-bold">{summary.conversionRate.toFixed(1)}%</div>
-            <div className="text-purple-100 text-sm">Conversion Rate</div>
+            <div className="text-purple-100 text-sm">{conversionRateLabel}</div>
+            <div className="text-purple-100 text-xs mt-1 opacity-80">{conversionRateDescription}</div>
           </CardContent>
         </Card>
 
