@@ -6,14 +6,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { formatCurrency, formatNumber } from '@/utils/formatters';
-import { TrendingUp, TrendingDown, Users, ShoppingCart, Calendar, MapPin, BarChart3, DollarSign, Activity, CreditCard, Target, Clock, Star, Zap, X } from 'lucide-react';
+import { TrendingUp, TrendingDown, Users, ShoppingCart, Calendar, MapPin, BarChart3, DollarSign, Activity, CreditCard, Target, Clock, Star, Zap, X, Trophy } from 'lucide-react';
 import { NewClientData } from '@/types/dashboard';
 interface ClientConversionDrillDownModalV3Props {
   isOpen: boolean;
   onClose: () => void;
   title: string;
   data: any;
-  type: 'month' | 'year' | 'class' | 'membership' | 'metric';
+  type: 'month' | 'year' | 'class' | 'membership' | 'metric' | 'ranking';
 }
 export const ClientConversionDrillDownModalV3: React.FC<ClientConversionDrillDownModalV3Props> = ({
   isOpen,
@@ -27,6 +27,12 @@ export const ClientConversionDrillDownModalV3: React.FC<ClientConversionDrillDow
   // Extract targeted client data based on type and drill-down context
   const clients: NewClientData[] = React.useMemo(() => {
     if (!data) return [];
+
+    // For ranking type, use the related clients
+    if (type === 'ranking' && data.relatedClients) {
+      console.log('Drill-down V3: Using ranking related clients:', data.relatedClients.length);
+      return data.relatedClients;
+    }
 
     // For metric card clicks, use the filtered clients array
     if (type === 'metric' && data.clients) {
@@ -214,8 +220,14 @@ export const ClientConversionDrillDownModalV3: React.FC<ClientConversionDrillDow
           {renderMetricCards()}
 
           {/* Main Content Tabs */}
-          <Tabs defaultValue="overview" className="w-full">
-            <TabsList className="grid w-full grid-cols-3 bg-slate-100">
+          <Tabs defaultValue={type === 'ranking' ? 'ranking' : 'overview'} className="w-full">
+            <TabsList className={`grid w-full ${type === 'ranking' ? 'grid-cols-4' : 'grid-cols-3'} bg-slate-100`}>
+              {type === 'ranking' && (
+                <TabsTrigger value="ranking" className="gap-2">
+                  <Trophy className="w-4 h-4" />
+                  Ranking Details
+                </TabsTrigger>
+              )}
               <TabsTrigger value="overview" className="gap-2">
                 <Star className="w-4 h-4" />
                 Overview
@@ -229,6 +241,130 @@ export const ClientConversionDrillDownModalV3: React.FC<ClientConversionDrillDow
                 Insights
               </TabsTrigger>
             </TabsList>
+            
+            {type === 'ranking' && (
+              <TabsContent value="ranking" className="space-y-6">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {/* Performance Details */}
+                  <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200">
+                    <CardHeader>
+                      <CardTitle className="text-blue-800 flex items-center gap-2">
+                        <BarChart3 className="w-5 h-5" />
+                        Performance Metrics
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      {data.type === 'trainer' && (
+                        <>
+                          <div className="flex justify-between items-center p-3 bg-white rounded-lg">
+                            <span className="font-medium">Total Sessions</span>
+                            <span className="text-lg font-bold text-blue-600">{data.item.totalSessions || 0}</span>
+                          </div>
+                          <div className="flex justify-between items-center p-3 bg-white rounded-lg">
+                            <span className="font-medium">Empty Sessions</span>
+                            <span className="text-lg font-bold text-orange-600">{data.item.totalEmptySessions || 0}</span>
+                          </div>
+                          <div className="flex justify-between items-center p-3 bg-white rounded-lg">
+                            <span className="font-medium">Class Average</span>
+                            <span className="text-lg font-bold text-green-600">{(data.item.classAverage || 0).toFixed(1)}</span>
+                          </div>
+                          <div className="flex justify-between items-center p-3 bg-white rounded-lg">
+                            <span className="font-medium">Conversion Rate</span>
+                            <span className="text-lg font-bold text-purple-600">{(data.item.conversionRate || 0).toFixed(1)}%</span>
+                          </div>
+                          <div className="flex justify-between items-center p-3 bg-white rounded-lg">
+                            <span className="font-medium">Empty Class Rate</span>
+                            <span className="text-lg font-bold text-red-600">{(data.item.emptyClassRate || 0).toFixed(1)}%</span>
+                          </div>
+                        </>
+                      )}
+                      
+                      {data.type === 'location' && (
+                        <>
+                          <div className="flex justify-between items-center p-3 bg-white rounded-lg">
+                            <span className="font-medium">Total Sessions</span>
+                            <span className="text-lg font-bold text-blue-600">{data.item.totalSessions || 0}</span>
+                          </div>
+                          <div className="flex justify-between items-center p-3 bg-white rounded-lg">
+                            <span className="font-medium">Total Customers</span>
+                            <span className="text-lg font-bold text-green-600">{data.item.totalCustomers || 0}</span>
+                          </div>
+                          <div className="flex justify-between items-center p-3 bg-white rounded-lg">
+                            <span className="font-medium">Class Average</span>
+                            <span className="text-lg font-bold text-purple-600">{(data.item.classAverage || 0).toFixed(1)}</span>
+                          </div>
+                          <div className="flex justify-between items-center p-3 bg-white rounded-lg">
+                            <span className="font-medium">Empty Sessions</span>
+                            <span className="text-lg font-bold text-orange-600">{data.item.totalEmptySessions || 0}</span>
+                          </div>
+                        </>
+                      )}
+                      
+                      {data.type === 'membership' && (
+                        <>
+                          <div className="flex justify-between items-center p-3 bg-white rounded-lg">
+                            <span className="font-medium">Total Clients</span>
+                            <span className="text-lg font-bold text-blue-600">{data.item.totalClients || 0}</span>
+                          </div>
+                          <div className="flex justify-between items-center p-3 bg-white rounded-lg">
+                            <span className="font-medium">New Members</span>
+                            <span className="text-lg font-bold text-green-600">{data.item.newMembers || 0}</span>
+                          </div>
+                          <div className="flex justify-between items-center p-3 bg-white rounded-lg">
+                            <span className="font-medium">Conversion Rate</span>
+                            <span className="text-lg font-bold text-purple-600">{(data.item.conversionRate || 0).toFixed(1)}%</span>
+                          </div>
+                          <div className="flex justify-between items-center p-3 bg-white rounded-lg">
+                            <span className="font-medium">Average LTV</span>
+                            <span className="text-lg font-bold text-orange-600">{formatCurrency(data.item.avgLTV || 0)}</span>
+                          </div>
+                        </>
+                      )}
+                    </CardContent>
+                  </Card>
+
+                  {/* Ranking Context */}
+                  <Card className="bg-gradient-to-br from-emerald-50 to-emerald-100 border-emerald-200">
+                    <CardHeader>
+                      <CardTitle className="text-emerald-800 flex items-center gap-2">
+                        <Target className="w-5 h-5" />
+                        Ranking Context
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="p-4 bg-white rounded-lg border-l-4 border-emerald-400">
+                        <h4 className="font-semibold text-emerald-800 mb-2">Selected Metric</h4>
+                        <p className="text-emerald-600">{data.metric}</p>
+                      </div>
+                      
+                      <div className="p-4 bg-white rounded-lg border-l-4 border-blue-400">
+                        <h4 className="font-semibold text-blue-800 mb-2">Type</h4>
+                        <p className="text-blue-600 capitalize">{data.type}</p>
+                      </div>
+                      
+                      <div className="p-4 bg-white rounded-lg border-l-4 border-purple-400">
+                        <h4 className="font-semibold text-purple-800 mb-2">Performance Score</h4>
+                        <div className="text-2xl font-bold text-purple-600">
+                          {data.metric === 'avgLTV' ? formatCurrency(data.item[data.metric] || 0) : 
+                           data.metric.includes('Rate') || data.metric.includes('Conversion') ? 
+                           `${(data.item[data.metric] || 0).toFixed(1)}%` : 
+                           formatNumber(data.item[data.metric] || 0)}
+                        </div>
+                      </div>
+
+                      {data.relatedPayroll && data.relatedPayroll.length > 0 && (
+                        <div className="p-4 bg-white rounded-lg border-l-4 border-orange-400">
+                          <h4 className="font-semibold text-orange-800 mb-2">Related Data</h4>
+                          <p className="text-orange-600 text-sm">
+                            {data.relatedPayroll.length} payroll records found for this {data.type}
+                          </p>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                </div>
+              </TabsContent>
+            )}
             
             <TabsContent value="overview" className="space-y-6">
               <Card className="bg-gradient-to-br from-indigo-50 to-indigo-100 border-indigo-200">

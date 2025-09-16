@@ -460,7 +460,33 @@ const ClientRetention = () => {
 
           {/* Enhanced Simplified Ranking System */}
           <div className="glass-card modern-card-hover rounded-2xl p-6 slide-in-right stagger-3">
-            <ClientConversionSimplifiedRanks data={filteredData} />
+            <ClientConversionSimplifiedRanks 
+              data={filteredData} 
+              payrollData={payrollData}
+              selectedLocation={selectedLocation}
+              onDrillDown={(type, item, metric) => setDrillDownModal({
+                isOpen: true,
+                client: null,
+                title: `${item.name} - ${metric} Analysis`,
+                data: {
+                  type,
+                  item,
+                  metric,
+                  relatedClients: filteredData.filter(client => {
+                    if (type === 'trainer') return client.trainerName === item.name;
+                    if (type === 'location') return client.firstVisitLocation === item.name || client.homeLocation === item.name;
+                    if (type === 'membership') return client.membershipUsed === item.name;
+                    return false;
+                  }),
+                  relatedPayroll: payrollData.filter(payroll => {
+                    if (type === 'trainer') return payroll.teacherName === item.name;
+                    if (type === 'location') return payroll.location === item.name;
+                    return false;
+                  })
+                },
+                type: 'ranking'
+              })}
+            />
           </div>
 
           {/* Enhanced Interactive Charts - Collapsed by default */}

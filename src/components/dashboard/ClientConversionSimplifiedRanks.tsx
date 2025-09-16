@@ -13,28 +13,59 @@ import {
   AlertTriangle,
   BarChart3,
   XCircle,
-  Calendar
+  Calendar,
+  ChevronDown,
+  ChevronUp,
+  Eye,
+  TrendingUp
 } from 'lucide-react';
 import { formatCurrency, formatNumber } from '@/utils/formatters';
 import { NewClientData, PayrollData } from '@/types/dashboard';
-import { usePayrollData } from '@/hooks/usePayrollData';
 
 interface ClientConversionSimplifiedRanksProps {
   data: NewClientData[];
+  payrollData: PayrollData[];
+  selectedLocation: string;
+  onDrillDown?: (type: string, item: any, metric: string) => void;
 }
 
-export const ClientConversionSimplifiedRanks: React.FC<ClientConversionSimplifiedRanksProps> = ({ data }) => {
-  const { data: payrollData, isLoading: payrollLoading } = usePayrollData();
+export const ClientConversionSimplifiedRanks: React.FC<ClientConversionSimplifiedRanksProps> = ({ 
+  data, 
+  payrollData, 
+  selectedLocation, 
+  onDrillDown 
+}) => {
   const [selectedRanking, setSelectedRanking] = useState('trainer-conversion');
+  const [showMore, setShowMore] = useState(false);
 
-  // Calculate trainer stats using both New Client data and Payroll data
-  const trainerStats = React.useMemo(() => {
+  // Filter payroll data based on selected location
+  const filteredPayrollData = React.useMemo(() => {
     if (!payrollData || payrollData.length === 0) return [];
+    
+    if (selectedLocation === 'All Locations') return payrollData;
+    
+    return payrollData.filter(payroll => {
+      const payrollLocation = payroll.location || '';
+      
+      // For Kenkere House, use flexible matching
+      if (selectedLocation === 'Kenkere House, Bengaluru') {
+        return payrollLocation.toLowerCase().includes('kenkere') || 
+               payrollLocation.toLowerCase().includes('bengaluru');
+      }
+      
+      // For other locations, use exact match
+      return payrollLocation === selectedLocation;
+    });
+  }, [payrollData, selectedLocation]);
+
+  // Calculate trainer stats using both filtered New Client data and filtered Payroll data
+  const trainerStats = React.useMemo(() => {
+    if (!filteredPayrollData || filteredPayrollData.length === 0) return [];
     
     const stats = new Map();
     
-    // First, get base stats from payroll data (class data)
-    payrollData.forEach(payroll => {
+    // First, get base stats from filtered payroll data (class data)
+    filteredPayrollData.forEach(payroll => {
       const trainer = payroll.teacherName;
       if (!trainer || trainer === 'Unknown') return;
       
@@ -64,7 +95,7 @@ export const ClientConversionSimplifiedRanks: React.FC<ClientConversionSimplifie
       trainerStat.totalNew += payroll.new || 0;
     });
     
-    // Then, add client data for LTV calculations
+    // Then, add filtered client data for LTV calculations
     data.forEach(client => {
       const trainer = client.trainerName;
       if (!trainer || trainer === 'Unknown' || !stats.has(trainer)) return;
@@ -82,16 +113,16 @@ export const ClientConversionSimplifiedRanks: React.FC<ClientConversionSimplifie
       avgLTV: stat.clientCount > 0 ? stat.totalLTV / stat.clientCount : 0,
       emptyClassRate: stat.totalSessions > 0 ? (stat.totalEmptySessions / stat.totalSessions) * 100 : 0
     })).filter(stat => stat.totalSessions > 0); // Only include trainers with sessions
-  }, [data, payrollData]);
+  }, [data, filteredPayrollData]);
 
-  // Calculate location stats using both datasets
+  // Calculate location stats using both filtered datasets
   const locationStats = React.useMemo(() => {
-    if (!payrollData || payrollData.length === 0) return [];
+    if (!filteredPayrollData || filteredPayrollData.length === 0) return [];
     
     const stats = new Map();
     
-    // Get base stats from payroll data
-    payrollData.forEach(payroll => {
+    // Get base stats from filtered payroll data
+    filteredPayrollData.forEach(payroll => {
       const location = payroll.location;
       if (!location) return;
       
@@ -120,7 +151,7 @@ export const ClientConversionSimplifiedRanks: React.FC<ClientConversionSimplifie
       locationStat.totalNew += payroll.new || 0;
     });
     
-    // Add client data for LTV calculations
+    // Add filtered client data for LTV calculations
     data.forEach(client => {
       const location = client.firstVisitLocation || client.homeLocation;
       if (!location || !stats.has(location)) return;
@@ -138,9 +169,9 @@ export const ClientConversionSimplifiedRanks: React.FC<ClientConversionSimplifie
       avgLTV: stat.clientCount > 0 ? stat.totalLTV / stat.clientCount : 0,
       emptyClassRate: stat.totalSessions > 0 ? (stat.totalEmptySessions / stat.totalSessions) * 100 : 0
     })).filter(stat => stat.totalSessions > 0);
-  }, [data, payrollData]);
+  }, [data, filteredPayrollData]);
 
-  // Calculate membership stats from client data only
+  // Calculate membership stats from filtered client data only
   const membershipStats = React.useMemo(() => {
     const stats = new Map();
     
@@ -201,7 +232,7 @@ export const ClientConversionSimplifiedRanks: React.FC<ClientConversionSimplifie
 
   const getCurrentData = () => {
     const option = rankingOptions.find(r => r.id === selectedRanking);
-    if (!option) return { top: [], bottom: [] };
+    if (!option) return { top: [], bottom: [], allData: [] };
 
     let sourceData;
     switch (option.type) {
@@ -235,17 +266,19 @@ export const ClientConversionSimplifiedRanks: React.FC<ClientConversionSimplifie
       return b[option.metric] - a[option.metric];
     });
     
+    const displayCount = showMore ? Math.max(10, sorted.length) : 5;
+    
     return {
-      top: sorted.slice(0, 5),
-      bottom: option.metric === 'emptyClassRate' ? sorted.slice(-5).reverse() : sorted.slice(-5).reverse()
+      top: sorted.slice(0, displayCount),
+      bottom: option.metric === 'emptyClassRate' ? 
+        sorted.slice(-displayCount).reverse() : 
+        sorted.slice(-displayCount).reverse(),
+      allData: sorted,
+      hasMore: sorted.length > 5
     };
   };
 
-  if (payrollLoading) {
-    return <div className="flex items-center justify-center p-8">Loading payroll data...</div>;
-  }
-
-  const { top, bottom } = getCurrentData();
+  const { top, bottom, allData, hasMore } = getCurrentData();
   const currentOption = rankingOptions.find(r => r.id === selectedRanking);
 
   const formatValue = (value: number, metric: string) => {
@@ -285,7 +318,8 @@ export const ClientConversionSimplifiedRanks: React.FC<ClientConversionSimplifie
         {rankData.map((item, index) => (
           <div 
             key={item.name} 
-            className="flex items-center justify-between p-4 bg-gradient-to-r from-slate-50 to-slate-100 rounded-xl hover:from-slate-100 hover:to-slate-200 transition-all duration-300 group-hover:scale-105"
+            className="flex items-center justify-between p-4 bg-gradient-to-r from-slate-50 to-slate-100 rounded-xl hover:from-slate-100 hover:to-slate-200 transition-all duration-300 group-hover:scale-105 cursor-pointer hover:shadow-md"
+            onClick={() => onDrillDown?.(currentOption?.type || 'trainer', item, currentOption?.metric || 'conversionRate')}
           >
             <div className="flex items-center gap-4">
               <div className={`flex items-center justify-center w-10 h-10 rounded-full font-bold text-sm transition-all duration-300 ${
@@ -305,24 +339,54 @@ export const ClientConversionSimplifiedRanks: React.FC<ClientConversionSimplifie
                 </p>
               </div>
             </div>
-            <div className="text-right">
-              <Badge 
-                className={`font-bold text-sm px-3 py-1 ${
-                  isTop 
-                    ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' 
-                    : 'bg-orange-100 text-orange-800 border border-orange-200'
-                }`}
-              >
-                {formatValue(item[currentOption?.metric || 'conversionRate'], currentOption?.metric || 'conversionRate')}
-              </Badge>
-              {(currentOption?.type === 'trainer' || currentOption?.type === 'location') && (
-                <p className="text-xs text-slate-500 mt-1">
-                  {item.classAverage?.toFixed(1)} avg
-                </p>
-              )}
+            <div className="text-right flex items-center gap-2">
+              <div>
+                <Badge 
+                  className={`font-bold text-sm px-3 py-1 ${
+                    isTop 
+                      ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' 
+                      : 'bg-orange-100 text-orange-800 border border-orange-200'
+                  }`}
+                >
+                  {formatValue(item[currentOption?.metric || 'conversionRate'], currentOption?.metric || 'conversionRate')}
+                </Badge>
+                {(currentOption?.type === 'trainer' || currentOption?.type === 'location') && (
+                  <p className="text-xs text-slate-500 mt-1">
+                    {item.classAverage?.toFixed(1)} avg
+                  </p>
+                )}
+              </div>
+              <Eye className="w-4 h-4 text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity" />
             </div>
           </div>
         ))}
+        
+        {/* View More/Less Button */}
+        {hasMore && (
+          <div className="flex justify-center pt-4 border-t border-slate-200">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowMore(!showMore);
+              }}
+              className="flex items-center gap-2 text-slate-600 hover:text-slate-800"
+            >
+              {showMore ? (
+                <>
+                  <ChevronUp className="w-4 h-4" />
+                  Show Less
+                </>
+              ) : (
+                <>
+                  <ChevronDown className="w-4 h-4" />
+                  View More ({allData?.length || 0} total)
+                </>
+              )}
+            </Button>
+          </div>
+        )}
       </CardContent>
     </Card>
   );
@@ -336,9 +400,15 @@ export const ClientConversionSimplifiedRanks: React.FC<ClientConversionSimplifie
             <Trophy className="w-6 h-6 text-yellow-600" />
             Performance Rankings
             <span className="text-sm font-normal text-slate-500 ml-2">
-              Based on New Client and Payroll data
+              Based on filtered data ({data.length} clients, {filteredPayrollData.length} payroll records)
             </span>
           </CardTitle>
+          {selectedLocation !== 'All Locations' && (
+            <div className="flex items-center gap-2 text-sm text-blue-600 bg-blue-50 px-3 py-1 rounded-lg">
+              <MapPin className="w-4 h-4" />
+              Filtered by: {selectedLocation}
+            </div>
+          )}
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
@@ -364,6 +434,33 @@ export const ClientConversionSimplifiedRanks: React.FC<ClientConversionSimplifie
         </CardContent>
       </Card>
 
+      {/* Data Summary */}
+      <div className="grid grid-cols-3 gap-4">
+        <Card className="bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200">
+          <CardContent className="p-4 text-center">
+            <div className="text-2xl font-bold text-blue-700">{allData?.length || 0}</div>
+            <div className="text-sm text-blue-600">
+              {currentOption?.type === 'membership' ? 'Memberships' : 
+               currentOption?.type === 'location' ? 'Locations' : 'Trainers'} with sufficient data
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card className="bg-gradient-to-r from-green-50 to-emerald-50 border-green-200">
+          <CardContent className="p-4 text-center">
+            <div className="text-2xl font-bold text-green-700">{top.length}</div>
+            <div className="text-sm text-green-600">Top performers shown</div>
+          </CardContent>
+        </Card>
+        
+        <Card className="bg-gradient-to-r from-orange-50 to-red-50 border-orange-200">
+          <CardContent className="p-4 text-center">
+            <div className="text-2xl font-bold text-orange-700">{bottom.length}</div>
+            <div className="text-sm text-orange-600">Bottom performers shown</div>
+          </CardContent>
+        </Card>
+      </div>
+
       {/* Top and Bottom Rankings */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <RankCard
@@ -377,6 +474,11 @@ export const ClientConversionSimplifiedRanks: React.FC<ClientConversionSimplifie
           data={bottom}
           isTop={false}
         />
+      </div>
+      
+      {/* Click to drill down instruction */}
+      <div className="text-center text-sm text-slate-500 bg-slate-50 p-3 rounded-lg">
+        💡 Click on any ranking item to view detailed analytics and drill-down insights
       </div>
     </div>
   );
