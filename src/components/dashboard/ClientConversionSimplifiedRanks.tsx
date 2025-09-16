@@ -245,7 +245,7 @@ export const ClientConversionSimplifiedRanks: React.FC<ClientConversionSimplifie
     
     return Array.from(stats.values()).map(stat => {
       const conversionRate = stat.totalNew > 0 ? (stat.totalConverted / stat.totalNew) * 100 : 0;
-      const retentionRate = stat.totalConverted > 0 ? (stat.totalRetained / stat.totalConverted) * 100 : 0;
+      const retentionRate = stat.totalNew > 0 ? (stat.totalRetained / stat.totalNew) * 100 : 0;
       const classAverage = stat.totalNonEmptySessions > 0 ? stat.totalCustomers / stat.totalNonEmptySessions : 0;
       const avgLTV = stat.clientCount > 0 ? stat.totalLTV / stat.clientCount : 0;
       const emptyClassRate = stat.totalSessions > 0 ? (stat.totalEmptySessions / stat.totalSessions) * 100 : 0;
@@ -379,7 +379,7 @@ export const ClientConversionSimplifiedRanks: React.FC<ClientConversionSimplifie
     
     return Array.from(stats.values()).map(stat => {
       const conversionRate = stat.totalNew > 0 ? (stat.totalConverted / stat.totalNew) * 100 : 0;
-      const retentionRate = stat.totalConverted > 0 ? (stat.totalRetained / stat.totalConverted) * 100 : 0;
+      const retentionRate = stat.totalNew > 0 ? (stat.totalRetained / stat.totalNew) * 100 : 0;
       const classAverage = stat.totalNonEmptySessions > 0 ? stat.totalCustomers / stat.totalNonEmptySessions : 0;
       const avgLTV = stat.clientCount > 0 ? stat.totalLTV / stat.clientCount : 0;
       const emptyClassRate = stat.totalSessions > 0 ? (stat.totalEmptySessions / stat.totalSessions) * 100 : 0;
@@ -476,7 +476,7 @@ export const ClientConversionSimplifiedRanks: React.FC<ClientConversionSimplifie
     
     return Array.from(stats.values()).map(stat => {
       const conversionRate = stat.newMembers > 0 ? (stat.converted / stat.newMembers) * 100 : 0;
-      const retentionRate = stat.converted > 0 ? (stat.retained / stat.converted) * 100 : 0;
+      const retentionRate = stat.newMembers > 0 ? (stat.retained / stat.newMembers) * 100 : 0;
       const avgLTV = stat.totalClients > 0 ? stat.totalLTV / stat.totalClients : 0;
 
       // Calculate growth metrics
@@ -525,14 +525,14 @@ export const ClientConversionSimplifiedRanks: React.FC<ClientConversionSimplifie
     return `${type}-${metricId}`;
   };
 
-  // Auto-select first available ranking when type or metric changes
+  // Auto-select first available ranking when type changes
   React.useEffect(() => {
     if (availableMetrics.length > 0) {
       const firstMetric = availableMetrics[0];
       const newRankingKey = getCurrentRankingKey(selectedType, firstMetric.id);
       setSelectedRanking(newRankingKey);
     }
-  }, [selectedType, availableMetrics]);
+  }, [selectedType]);
 
   const getCurrentData = () => {
     // Get current metric from selectedRanking
@@ -578,7 +578,11 @@ export const ClientConversionSimplifiedRanks: React.FC<ClientConversionSimplifie
     };
   };
 
-  const { top, bottom, allData, hasMore } = getCurrentData();
+  const currentData = React.useMemo(() => {
+    return getCurrentData();
+  }, [selectedRanking, selectedType, trainerStats, locationStats, showMore]);
+
+  const { top, bottom, allData, hasMore } = currentData;
   const currentMetric = availableMetrics.find(m => m.id === selectedRanking.split('-')[1]);
 
   const formatValue = (value: number, metric: string) => {

@@ -101,6 +101,57 @@ export const ClientConversionDrillDownModalV3: React.FC<ClientConversionDrillDow
     };
   }, [clients, type, data]);
   const renderMetricCards = () => {
+    // For ranking type, focus on the selected metric
+    if (type === 'ranking' && data.metric) {
+      return (
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
+          {/* Primary Metric Card - The selected metric */}
+          <Card className="bg-gradient-to-br from-emerald-500 to-emerald-600 text-white border-0 shadow-lg col-span-1 lg:col-span-2">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between mb-3">
+                <Trophy className="w-6 h-6 text-emerald-100" />
+                <Badge className="bg-white/20 text-white border-0">Selected Metric</Badge>
+              </div>
+              <div className="text-3xl font-bold mb-2">
+                {data.metric === 'avgLTV' ? formatCurrency(data.item[data.metric] || 0) : 
+                 data.metric.includes('Rate') || data.metric.includes('Conversion') ? 
+                 `${(data.item[data.metric] || 0).toFixed(1)}%` : 
+                 formatNumber(data.item[data.metric] || 0)}
+              </div>
+              <div className="text-emerald-100 text-sm capitalize">{data.metric.replace(/([A-Z])/g, ' $1').trim()}</div>
+              <div className="mt-2 text-emerald-200 text-xs">
+                {data.type.charAt(0).toUpperCase() + data.type.slice(1)}: {data.item.name}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Supporting Metrics */}
+          <Card className="bg-gradient-to-br from-blue-500 to-blue-600 text-white border-0 shadow-lg">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between mb-2">
+                <Users className="w-5 h-5 text-blue-100" />
+                <Badge className="bg-white/20 text-white border-0">Total</Badge>
+              </div>
+              <div className="text-2xl font-bold">{formatNumber(summary.totalMembers)}</div>
+              <div className="text-blue-100 text-sm">Total Members</div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gradient-to-br from-purple-500 to-purple-600 text-white border-0 shadow-lg">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between mb-2">
+                <Target className="w-5 h-5 text-purple-100" />
+                <Badge className="bg-white/20 text-white border-0">Rate</Badge>
+              </div>
+              <div className="text-2xl font-bold">{summary.conversionRate.toFixed(1)}%</div>
+              <div className="text-purple-100 text-sm">Conversion Rate</div>
+            </CardContent>
+          </Card>
+        </div>
+      );
+    }
+
+    // For other types, show the general overview
     return (
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
         <Card className="bg-gradient-to-br from-blue-500 to-blue-600 text-white border-0 shadow-lg">
