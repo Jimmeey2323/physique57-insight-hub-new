@@ -501,14 +501,6 @@ const ClientRetention = () => {
             })} />
           </div>
 
-          {/* Metric Selector for Rankings */}
-          <div className="glass-card modern-card-hover rounded-2xl p-6 slide-in-right stagger-2">
-            <ClientRetentionMetricSelector 
-              selectedMetric={selectedMetric}
-              onMetricChange={setSelectedMetric}
-            />
-          </div>
-
           {/* Enhanced Simplified Ranking System */}
           <div className="glass-card modern-card-hover rounded-2xl p-6 slide-in-right stagger-3">
             <ClientConversionSimplifiedRanks 

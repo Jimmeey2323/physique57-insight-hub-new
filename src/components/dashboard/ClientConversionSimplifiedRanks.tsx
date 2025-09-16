@@ -17,7 +17,8 @@ import {
   ChevronDown,
   ChevronUp,
   Eye,
-  TrendingUp
+  TrendingUp,
+  Activity
 } from 'lucide-react';
 import { formatCurrency, formatNumber } from '@/utils/formatters';
 import { NewClientData, PayrollData } from '@/types/dashboard';
@@ -29,7 +30,7 @@ interface ClientConversionSimplifiedRanksProps {
   allClientData: NewClientData[];
   selectedLocation: string;
   dateRange: { start: string; end: string };
-  selectedMetric?: string; // New prop to control which metric to display
+  selectedMetric?: string;
   onDrillDown?: (type: string, item: any, metric: string) => void;
 }
 
@@ -248,8 +249,8 @@ export const ClientConversionSimplifiedRanks: React.FC<ClientConversionSimplifie
       const classAverage = stat.totalNonEmptySessions > 0 ? stat.totalCustomers / stat.totalNonEmptySessions : 0;
       const avgLTV = stat.clientCount > 0 ? stat.totalLTV / stat.clientCount : 0;
       const emptyClassRate = stat.totalSessions > 0 ? (stat.totalEmptySessions / stat.totalSessions) * 100 : 0;
-
-      // Calculate growth metrics
+      
+      // Calculate growth metrics first
       const prevStat = prevStats.get(stat.name);
       let conversionGrowth = 0;
       let classAverageGrowth = 0;
@@ -266,6 +267,12 @@ export const ClientConversionSimplifiedRanks: React.FC<ClientConversionSimplifie
         sessionsGrowth = prevStat.totalSessions > 0 ? ((stat.totalSessions - prevStat.totalSessions) / prevStat.totalSessions) * 100 : 0;
         emptyClassRateGrowth = prevEmptyClassRate > 0 ? ((emptyClassRate - prevEmptyClassRate) / prevEmptyClassRate) * 100 : 0;
       }
+      
+      // Additional metrics
+      const revenuePerSession = stat.totalSessions > 0 ? (avgLTV * stat.clientCount) / stat.totalSessions : 0;
+      const efficiencyScore = stat.totalNonEmptySessions > 0 ? 
+        ((classAverage / 20) * 0.4 + (retentionRate / 100) * 0.3 + ((100 - emptyClassRate) / 100) * 0.3) * 100 : 0;
+      const growthRate = conversionGrowth; // Use conversion growth as overall growth indicator
 
       return {
         ...stat,
@@ -274,6 +281,9 @@ export const ClientConversionSimplifiedRanks: React.FC<ClientConversionSimplifie
         classAverage,
         avgLTV,
         emptyClassRate,
+        revenuePerSession,
+        efficiencyScore,
+        growthRate,
         conversionGrowth,
         classAverageGrowth,
         sessionsGrowth,
@@ -499,11 +509,15 @@ export const ClientConversionSimplifiedRanks: React.FC<ClientConversionSimplifie
   // All available metrics without any filtering
   const availableMetrics = [
     { id: 'conversion', label: 'Conversion Rate', icon: Trophy, metric: 'conversionRate' },
+    { id: 'retention', label: 'Retention Rate', icon: Target, metric: 'retentionRate' },
     { id: 'sessions', label: 'Total Sessions', icon: Calendar, metric: 'totalSessions' },
     { id: 'average', label: 'Class Average', icon: BarChart3, metric: 'classAverage' },
     { id: 'empty', label: 'Empty Classes', icon: XCircle, metric: 'emptyClassRate' },
     { id: 'customers', label: 'Total Customers', icon: Users, metric: 'totalCustomers' },
     { id: 'ltv', label: 'Average LTV', icon: DollarSign, metric: 'avgLTV' },
+    { id: 'revenue', label: 'Revenue per Session', icon: TrendingUp, metric: 'revenuePerSession' },
+    { id: 'growth', label: 'Growth Rate', icon: TrendingUp, metric: 'growthRate' },
+    { id: 'efficiency', label: 'Efficiency Score', icon: Activity, metric: 'efficiencyScore' },
   ];
 
   // Get current ranking key based on type and metric
@@ -597,6 +611,26 @@ export const ClientConversionSimplifiedRanks: React.FC<ClientConversionSimplifie
       ];
     }
     
+    // Return appropriate formatted value for each metric
+    const formatValue = (value: number, metricType: string) => {
+      switch (metricType) {
+        case 'retentionRate':
+        case 'conversionRate':
+        case 'emptyClassRate':
+        case 'growthRate':
+          return `${(value || 0).toFixed(1)}%`;
+        case 'avgLTV':
+        case 'revenuePerSession':
+          return `$${(value || 0).toFixed(2)}`;
+        case 'efficiencyScore':
+          return `${(value || 0).toFixed(0)}/100`;
+        case 'classAverage':
+          return `${(value || 0).toFixed(1)}`;
+        default:
+          return formatNumber(value || 0);
+      }
+    };
+    
     // For other metrics, return single metric
     return [
       { label: currentMetric?.label || '', value: formatValue(item[metric] || 0, metric), color: 'emerald' }
@@ -644,140 +678,92 @@ export const ClientConversionSimplifiedRanks: React.FC<ClientConversionSimplifie
       
       <CardContent className="relative p-6 space-y-4 bg-gradient-to-br from-white to-slate-50/30">
         {rankData.map((item, index) => (
-          <div 
+          <Card 
             key={item.name} 
-            className="group/item flex items-center justify-between p-5 bg-gradient-to-r from-white via-slate-50/50 to-white rounded-xl border border-slate-100 hover:border-slate-200 hover:shadow-xl transition-all duration-300 cursor-pointer hover:scale-[1.02] transform-gpu relative overflow-hidden"
+            className={`group/item transition-all duration-300 hover:shadow-lg cursor-pointer border-l-4 ${
+              isTop 
+                ? "hover:bg-green-50 border-l-green-500 bg-gradient-to-r from-green-50 to-white" 
+                : "hover:bg-red-50 border-l-red-500 bg-gradient-to-r from-red-50 to-white"
+            }`}
             onClick={() => onDrillDown?.(selectedType, item, currentMetric?.metric || 'conversionRate')}
           >
-            {/* Item background decoration */}
-            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-slate-50/30 to-transparent opacity-0 group-hover/item:opacity-100 transition-opacity duration-300" />
-            
-            <div className="flex items-center gap-4 relative z-10">
-              <div className={`flex items-center justify-center w-12 h-12 rounded-xl font-bold text-sm transition-all duration-300 shadow-lg group-hover/item:scale-110 transform-gpu ${
-                index === 0 && isTop
-                  ? 'bg-gradient-to-r from-yellow-400 to-yellow-500 text-yellow-900 shadow-yellow-200'
-                  : index === 1 && isTop
-                  ? 'bg-gradient-to-r from-gray-300 to-gray-400 text-gray-800 shadow-gray-200'
-                  : index === 2 && isTop
-                  ? 'bg-gradient-to-r from-orange-400 to-orange-500 text-orange-900 shadow-orange-200'
-                  : isTop
-                  ? 'bg-gradient-to-r from-emerald-100 to-emerald-200 text-emerald-800 shadow-emerald-100'
-                  : 'bg-gradient-to-r from-red-100 to-red-200 text-red-800 shadow-red-100'
-              }`}>
-                {index === 0 && isTop ? '🏆' : index === 1 && isTop ? '🥈' : index === 2 && isTop ? '🥉' : index + 1}
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="font-bold text-slate-900 truncate max-w-[200px] group-hover/item:text-slate-800 transition-colors text-lg" title={item.name}>
-                  {item.name}
-                </p>
-                <p className="text-sm text-slate-500 group-hover/item:text-slate-600 transition-colors">
-                  {getSecondaryMetric(item, selectedType)}
-                </p>
-              </div>
-            </div>
-            
-            <div className="text-right flex items-center gap-3 relative z-10">
-              {/* Multiple metrics display for conversion rankings */}
-              {(() => {
-                const metrics = getMainMetrics(item, currentMetric?.metric || 'conversionRate');
-                
-                if (metrics.length > 1) {
-                  // Modern layout for conversion metrics (similar to sales tab)
-                  return (
-                    <div className="flex flex-col gap-2">
-                      <div className="flex items-center gap-3">
-                        {metrics.map((metric, idx) => (
-                          <div key={idx} className="text-center">
-                            <div className={`font-bold text-lg ${
-                              metric.color === 'emerald' ? 'text-emerald-700' :
-                              metric.color === 'blue' ? 'text-blue-700' :
-                              metric.color === 'green' ? 'text-green-700' : 'text-slate-700'
-                            }`}>
-                              {metric.value}
-                            </div>
-                            <div className="text-xs text-slate-500 font-medium">
-                              {metric.label}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                      
-                      {/* Growth Indicator */}
-                      {(() => {
-                        const growth = item.conversionGrowth;
-                        if (growth && Math.abs(growth) > 0.1) {
-                          return (
-                            <div className={`flex items-center justify-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
-                              growth > 0 
-                                ? 'bg-green-100 text-green-700' 
-                                : 'bg-red-100 text-red-700'
-                            }`}>
-                              {growth > 0 ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
-                              {Math.abs(growth).toFixed(1)}%
-                            </div>
-                          );
-                        }
-                        return null;
-                      })()}
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-3">
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
+                    isTop ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
+                  }`}>
+                    {index === 0 && isTop ? '🏆' : index === 1 && isTop ? '🥈' : index === 2 && isTop ? '🥉' : index + 1}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="font-semibold text-gray-900 line-clamp-2 text-lg">
+                      {item.name}
                     </div>
-                  );
-                }
-                
-                // Single metric display for other rankings
-                return (
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <Badge 
-                        className={`font-bold text-lg px-4 py-2 ${
-                          isTop 
-                            ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' 
-                            : 'bg-orange-100 text-orange-800 border border-orange-200'
-                        }`}
-                      >
-                        {metrics[0].value}
-                      </Badge>
-                      {/* Growth Indicator */}
-                      {(() => {
-                        const getGrowthMetric = () => {
-                          if (currentMetric?.metric === 'conversionRate') return item.conversionGrowth;
-                          if (currentMetric?.metric === 'classAverage') return item.classAverageGrowth;
-                          if (currentMetric?.metric === 'totalSessions') return item.sessionsGrowth;
-                          if (currentMetric?.metric === 'emptyClassRate') return item.emptyClassRateGrowth;
-                          if (currentMetric?.metric === 'totalCustomers') return item.customersGrowth;
-                          if (currentMetric?.metric === 'totalClients') return item.clientsGrowth;
-                          if (currentMetric?.metric === 'avgLTV') return item.ltvGrowth;
-                          return 0;
-                        };
-                        
-                        const growth = getGrowthMetric();
-                        if (growth && Math.abs(growth) > 0.1) {
-                          return (
-                            <div className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
-                              growth > 0 
-                                ? 'bg-green-100 text-green-700' 
-                                : 'bg-red-100 text-red-700'
-                            }`}>
-                              {growth > 0 ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
-                              {Math.abs(growth).toFixed(1)}%
-                            </div>
-                          );
-                        }
-                        return null;
-                      })()}
+                    <div className="text-sm text-gray-600">
+                      {getSecondaryMetric(item, selectedType)}
                     </div>
                   </div>
-                );
-              })()}
+                </div>
+                
+                <div className="flex items-center gap-3">
+                  <Eye className={`w-5 h-5 ${isTop ? "text-green-600" : "text-red-600"}`} />
+                </div>
+              </div>
               
-              {/* Additional details for trainers/locations */}
-              {(selectedType === 'trainer' || selectedType === 'location') && (
-                <p className="text-xs text-slate-500 mt-1">
-                  {item.classAverage?.toFixed(1)} avg
-                </p>
-              )}
-            </div>
-            <Eye className="w-5 h-5 text-slate-400 opacity-0 group-hover/item:opacity-100 transition-opacity ml-3 relative z-10" />
-          </div>
+              <div className="flex items-center justify-between">
+                <div className={`text-lg font-bold ${isTop ? "text-green-600" : "text-red-600"}`}>
+                  {(() => {
+                    const metrics = getMainMetrics(item, currentMetric?.metric || 'conversionRate');
+                    return metrics[0]?.value || 'N/A';
+                  })()}
+                </div>
+                
+                <div className="flex flex-wrap gap-2">
+                  <Badge variant="outline" className="text-xs">
+                    {item.totalSessions || 0} sessions
+                  </Badge>
+                  <Badge variant="outline" className="text-xs">
+                    {formatNumber(item.totalCustomers || 0)} customers
+                  </Badge>
+                  {/* Growth Indicator */}
+                  {(() => {
+                    const getGrowthMetric = () => {
+                      if (currentMetric?.metric === 'conversionRate') return item.conversionGrowth;
+                      if (currentMetric?.metric === 'classAverage') return item.classAverageGrowth;
+                      if (currentMetric?.metric === 'totalSessions') return item.sessionsGrowth;
+                      if (currentMetric?.metric === 'emptyClassRate') return item.emptyClassRateGrowth;
+                      if (currentMetric?.metric === 'totalCustomers') return item.customersGrowth;
+                      if (currentMetric?.metric === 'totalClients') return item.clientsGrowth;
+                      if (currentMetric?.metric === 'avgLTV') return item.ltvGrowth;
+                      if (currentMetric?.metric === 'retentionRate') return item.conversionGrowth; // Use conversion growth as proxy
+                      if (currentMetric?.metric === 'revenuePerSession') return item.sessionsGrowth; // Use sessions growth as proxy
+                      if (currentMetric?.metric === 'growthRate') return item.growthRate;
+                      if (currentMetric?.metric === 'efficiencyScore') return item.classAverageGrowth; // Use class average growth as proxy
+                      return 0;
+                    };
+                    
+                    const growth = getGrowthMetric();
+                    if (growth && Math.abs(growth) > 0.1) {
+                      return (
+                        <Badge 
+                          variant="outline" 
+                          className={`text-xs flex items-center gap-1 ${
+                            growth > 0 
+                              ? 'border-green-300 text-green-700 bg-green-50' 
+                              : 'border-red-300 text-red-700 bg-red-50'
+                          }`}
+                        >
+                          {growth > 0 ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
+                          {Math.abs(growth).toFixed(1)}%
+                        </Badge>
+                      );
+                    }
+                    return null;
+                  })()}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         ))}
         
         {/* View More/Less Button */}
