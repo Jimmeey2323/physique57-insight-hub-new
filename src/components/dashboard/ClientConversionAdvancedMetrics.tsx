@@ -95,7 +95,7 @@ export const ClientConversionAdvancedMetrics: React.FC<ClientConversionAdvancedM
 
     const processed = Object.values(stats).map((stat: any) => ({
       ...stat,
-      conversionRate: stat.newMembers > 0 ? (stat.converted / stat.newMembers) * 100 : 0,
+      conversionRate: stat.totalClients > 0 ? (stat.converted / stat.totalClients) * 100 : 0,
       retentionRate: stat.totalClients > 0 ? (stat.retained / stat.totalClients) * 100 : 0,
       avgLTV: stat.totalClients > 0 ? stat.totalLTV / stat.totalClients : 0,
       avgConversionSpan: stat.conversionSpans.length > 0 
@@ -186,7 +186,7 @@ export const ClientConversionAdvancedMetrics: React.FC<ClientConversionAdvancedM
 
     return Object.values(isNewGroups).map((group: any) => ({
       ...group,
-      conversionRate: group.newMembers > 0 ? (group.converted / group.newMembers) * 100 : 0,
+      conversionRate: group.totalClients > 0 ? (group.converted / group.totalClients) * 100 : 0,
       retentionRate: group.totalClients > 0 ? (group.retained / group.totalClients) * 100 : 0,
       avgLTV: group.totalClients > 0 ? group.totalLTV / group.totalClients : 0,
       avgVisits: group.totalClients > 0 ? group.totalVisits / group.totalClients : 0,
@@ -225,7 +225,7 @@ export const ClientConversionAdvancedMetrics: React.FC<ClientConversionAdvancedM
 
     const processed = Object.values(stats).map((stat: any) => ({
       ...stat,
-      conversionRate: stat.newMembers > 0 ? (stat.converted / stat.newMembers) * 100 : 0,
+      conversionRate: stat.totalClients > 0 ? (stat.converted / stat.totalClients) * 100 : 0,
       retentionRate: stat.totalClients > 0 ? (stat.retained / stat.totalClients) * 100 : 0,
       avgLTV: stat.totalClients > 0 ? stat.totalLTV / stat.totalClients : 0,
       avgClassNo: stat.classNumbers.length > 0 
@@ -590,11 +590,10 @@ export const ClientConversionAdvancedMetrics: React.FC<ClientConversionAdvancedM
     }
   ];
 
-    // Calculate totals for membership table
+  // Calculate totals for membership table
   const membershipTotals = {
-    membership: 'TOTAL',
+    membershipType: 'TOTAL',
     totalClients: membershipStats.reduce((sum, stat) => sum + stat.totalClients, 0),
-    newMembers: membershipStats.reduce((sum, stat) => sum + stat.newMembers, 0),
     converted: membershipStats.reduce((sum, stat) => sum + stat.converted, 0),
     conversionRate: 0,
     retained: membershipStats.reduce((sum, stat) => sum + stat.retained, 0),
@@ -602,14 +601,13 @@ export const ClientConversionAdvancedMetrics: React.FC<ClientConversionAdvancedM
     avgLTV: membershipStats.reduce((sum, stat) => sum + stat.totalLTV, 0) / Math.max(membershipStats.reduce((sum, stat) => sum + stat.totalClients, 0), 1),
     avgConversionSpan: membershipStats.reduce((sum, stat) => sum + (stat.avgConversionSpan * stat.totalClients), 0) / Math.max(membershipStats.reduce((sum, stat) => sum + stat.totalClients, 0), 1)
   };
-  membershipTotals.conversionRate = membershipTotals.newMembers > 0 ? (membershipTotals.converted / membershipTotals.newMembers) * 100 : 0;
+  membershipTotals.conversionRate = membershipTotals.totalClients > 0 ? (membershipTotals.converted / membershipTotals.totalClients) * 100 : 0;
   membershipTotals.retentionRate = membershipTotals.totalClients > 0 ? (membershipTotals.retained / membershipTotals.totalClients) * 100 : 0;
 
   // Calculate totals for trainer table
   const trainerTotals = {
     trainerName: 'TOTAL',
     totalClients: trainerStats.reduce((sum, stat) => sum + stat.totalClients, 0),
-    newMembers: trainerStats.reduce((sum, stat) => sum + stat.newMembers, 0),
     converted: trainerStats.reduce((sum, stat) => sum + stat.converted, 0),
     conversionRate: 0,
     retained: trainerStats.reduce((sum, stat) => sum + stat.retained, 0),
@@ -617,7 +615,7 @@ export const ClientConversionAdvancedMetrics: React.FC<ClientConversionAdvancedM
     avgLTV: trainerStats.reduce((sum, stat) => sum + stat.totalLTV, 0) / Math.max(trainerStats.reduce((sum, stat) => sum + stat.totalClients, 0), 1),
     avgClassNo: trainerStats.reduce((sum, stat) => sum + (stat.avgClassNo * stat.totalClients), 0) / Math.max(trainerStats.reduce((sum, stat) => sum + stat.totalClients, 0), 1)
   };
-  trainerTotals.conversionRate = trainerTotals.newMembers > 0 ? (trainerTotals.converted / trainerTotals.newMembers) * 100 : 0;
+  trainerTotals.conversionRate = trainerTotals.totalClients > 0 ? (trainerTotals.converted / trainerTotals.totalClients) * 100 : 0;
   trainerTotals.retentionRate = trainerTotals.totalClients > 0 ? (trainerTotals.retained / trainerTotals.totalClients) * 100 : 0;
 
   return (
@@ -681,16 +679,7 @@ export const ClientConversionAdvancedMetrics: React.FC<ClientConversionAdvancedM
             data={hostedClassDetails}
             columns={hostedClassColumns}
             headerGradient="from-pink-600 to-rose-600"
-            showFooter={true}
-            footerData={{
-              className: `${hostedClassDetails.length} Classes Total`,
-              trainerName: `${new Set(hostedClassDetails.map(h => h.trainerName)).size} Trainers`,
-              totalHosted: hostedClassDetails.reduce((sum, h) => sum + h.totalHosted, 0),
-              newClients: hostedClassDetails.reduce((sum, h) => sum + h.newClients, 0),
-              converted: hostedClassDetails.reduce((sum, h) => sum + h.converted, 0),
-              conversionRate: hostedClassDetails.length > 0 ? (hostedClassDetails.reduce((sum, h) => sum + h.conversionRate, 0) / hostedClassDetails.length).toFixed(1) + '%' : '0%',
-              avgClassSize: hostedClassDetails.length > 0 ? (hostedClassDetails.reduce((sum, h) => sum + h.avgClassSize, 0) / hostedClassDetails.length).toFixed(1) : '0'
-            }}
+            showFooter={false}
             maxHeight="500px"
             onRowClick={onDrillDown ? (row) => {
               const drillData = data.filter(client =>
@@ -720,14 +709,7 @@ export const ClientConversionAdvancedMetrics: React.FC<ClientConversionAdvancedM
             data={isNewAnalysis.sort((a, b) => b.totalClients - a.totalClients)}
             columns={isNewColumns}
             headerGradient="from-indigo-600 to-purple-600"
-            showFooter={true}
-            footerData={{
-              isNewType: `${isNewAnalysis.length} Types Total`,
-              totalClients: isNewAnalysis.reduce((sum, item) => sum + item.totalClients, 0),
-              converted: isNewAnalysis.reduce((sum, item) => sum + item.converted, 0),
-              conversionRate: isNewAnalysis.length > 0 ? (isNewAnalysis.reduce((sum, item) => sum + (item.conversionRate || 0), 0) / isNewAnalysis.length).toFixed(1) + '%' : '0%',
-              avgRevenue: isNewAnalysis.length > 0 ? (isNewAnalysis.reduce((sum, item) => sum + (item.avgRevenue || 0), 0) / isNewAnalysis.length).toFixed(0) : '0'
-            }}
+            showFooter={false}
             maxHeight="400px"
             onRowClick={onDrillDown ? (row) => {
               const drillData = data.filter(client => (client.isNew || 'Unknown') === row.isNewType);
@@ -759,14 +741,7 @@ export const ClientConversionAdvancedMetrics: React.FC<ClientConversionAdvancedM
               { key: 'retained', header: 'Retained', align: 'center' },
             ]}
             headerGradient="from-pink-600 to-orange-600"
-            showFooter={true}
-            footerData={{
-              month: `${hostedClassMoM.length} Months Total`,
-              total: hostedClassMoM.reduce((sum, item) => sum + item.total, 0),
-              newClients: hostedClassMoM.reduce((sum, item) => sum + item.newClients, 0),
-              converted: hostedClassMoM.reduce((sum, item) => sum + item.converted, 0),
-              retained: hostedClassMoM.reduce((sum, item) => sum + item.retained, 0)
-            }}
+            showFooter={false}
             maxHeight="400px"
             onRowClick={onDrillDown ? (row) => {
               // Find all clients for this hosted class month

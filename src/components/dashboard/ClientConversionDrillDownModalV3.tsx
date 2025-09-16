@@ -6,14 +6,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { formatCurrency, formatNumber } from '@/utils/formatters';
-import { TrendingUp, TrendingDown, Users, ShoppingCart, Calendar, MapPin, BarChart3, DollarSign, Activity, CreditCard, Target, Clock, Star, Zap, X, Trophy, Table as TableIcon, Crown } from 'lucide-react';
+import { TrendingUp, TrendingDown, Users, ShoppingCart, Calendar, MapPin, BarChart3, DollarSign, Activity, CreditCard, Target, Clock, Star, Zap, X } from 'lucide-react';
 import { NewClientData } from '@/types/dashboard';
 interface ClientConversionDrillDownModalV3Props {
   isOpen: boolean;
   onClose: () => void;
   title: string;
   data: any;
-  type: 'month' | 'year' | 'class' | 'membership' | 'metric' | 'ranking';
+  type: 'month' | 'year' | 'class' | 'membership' | 'metric';
 }
 export const ClientConversionDrillDownModalV3: React.FC<ClientConversionDrillDownModalV3Props> = ({
   isOpen,
@@ -27,12 +27,6 @@ export const ClientConversionDrillDownModalV3: React.FC<ClientConversionDrillDow
   // Extract targeted client data based on type and drill-down context
   const clients: NewClientData[] = React.useMemo(() => {
     if (!data) return [];
-
-    // For ranking type, use the related clients
-    if (type === 'ranking' && data.relatedClients) {
-      console.log('Drill-down V3: Using ranking related clients:', data.relatedClients.length);
-      return data.relatedClients;
-    }
 
     // For metric card clicks, use the filtered clients array
     if (type === 'metric' && data.clients) {
@@ -56,9 +50,8 @@ export const ClientConversionDrillDownModalV3: React.FC<ClientConversionDrillDow
     return [];
   }, [data, type]);
 
-  // Calculate summary metrics from targeted clients OR use pre-calculated item values for ranking type
+  // Calculate summary metrics from targeted clients
   const summary = React.useMemo(() => {
-    // Always calculate from actual client data first for accuracy
     const totalMembers = clients.length;
     const newMembers = clients.filter(c => (c.isNew || '').toLowerCase().includes('new')).length;
     const convertedMembers = clients.filter(c => (c.conversionStatus || '').toLowerCase().includes('converted')).length;
@@ -66,130 +59,20 @@ export const ClientConversionDrillDownModalV3: React.FC<ClientConversionDrillDow
     const totalLTV = clients.reduce((sum, c) => sum + (c.ltv || 0), 0);
     const totalConversionSpan = clients.filter(c => c.conversionSpan > 0).reduce((sum, c) => sum + (c.conversionSpan || 0), 0);
     const clientsWithConversionData = clients.filter(c => c.conversionSpan > 0).length;
-    
-    // Calculate rates from actual client data
-    const calculatedConversionRate = newMembers > 0 ? (convertedMembers / newMembers) * 100 : 0;
-    const calculatedRetentionRate = newMembers > 0 ? (retainedMembers / newMembers) * 100 : 0;
-    const calculatedAvgLTV = totalMembers > 0 ? totalLTV / totalMembers : 0;
-    
-    // For ranking type, use calculated values if we have client data, otherwise fall back to pre-calculated
-    if (type === 'ranking' && data.item) {
-      return {
-        totalMembers: totalMembers > 0 ? totalMembers : (data.item.totalClients || data.item.clientCount || 0),
-        newMembers: totalMembers > 0 ? newMembers : (data.item.totalNew || 0),
-        convertedMembers: totalMembers > 0 ? convertedMembers : (data.item.totalConverted || 0),
-        retainedMembers: totalMembers > 0 ? retainedMembers : (data.item.totalRetained || 0),
-        conversionRate: totalMembers > 0 ? calculatedConversionRate : (data.item.conversionRate || 0),
-        retentionRate: totalMembers > 0 ? calculatedRetentionRate : (data.item.retentionRate || 0),
-        avgLTV: totalMembers > 0 ? calculatedAvgLTV : (data.item.avgLTV || 0),
-        totalLTV,
-        avgConversionTime: clientsWithConversionData > 0 ? totalConversionSpan / clientsWithConversionData : 0,
-        totalSessions: data.item.totalSessions || 0,
-        totalCustomers: data.item.totalCustomers || 0,
-        classAverage: data.item.classAverage || 0,
-        emptyClassRate: data.item.emptyClassRate || 0,
-        revenuePerSession: data.item.revenuePerSession || 0,
-        efficiencyScore: data.item.efficiencyScore || 0,
-        growthRate: data.item.growthRate || 0
-      };
-    }
-    
-    // For other types, use calculated values
     return {
       totalMembers,
       newMembers,
       convertedMembers,
       retainedMembers,
-      conversionRate: calculatedConversionRate,
-      retentionRate: calculatedRetentionRate,
-      avgLTV: calculatedAvgLTV,
+      conversionRate: newMembers > 0 ? convertedMembers / newMembers * 100 : 0,
+      retentionRate: totalMembers > 0 ? retainedMembers / totalMembers * 100 : 0,
+      avgLTV: totalMembers > 0 ? totalLTV / totalMembers : 0,
       totalLTV,
       avgConversionTime: clientsWithConversionData > 0 ? totalConversionSpan / clientsWithConversionData : 0
     };
-  }, [clients, type, data]);
+  }, [clients]);
   const renderMetricCards = () => {
-    // For ranking type, focus on the selected metric
-    if (type === 'ranking' && data.metric) {
-      return (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          {/* Primary Metric Card - The selected metric */}
-          <Card className="bg-gradient-to-br from-emerald-500 to-emerald-600 text-white border-0 shadow-lg">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between mb-3">
-                <Trophy className="w-6 h-6 text-emerald-100" />
-                <Badge className="bg-white/20 text-white border-0">Selected Metric</Badge>
-              </div>
-              <div className="text-3xl font-bold mb-2">
-                {data.metric === 'avgLTV' || data.metric === 'revenuePerSession' ? formatCurrency(data.item[data.metric] || 0) : 
-                 data.metric.includes('Rate') || data.metric.includes('Conversion') || data.metric.includes('retention') ? 
-                 `${(data.item[data.metric] || 0).toFixed(1)}%` : 
-                 formatNumber(data.item[data.metric] || 0)}
-              </div>
-              <div className="text-emerald-100 text-sm capitalize">{data.metric.replace(/([A-Z])/g, ' $1').trim()}</div>
-              <div className="mt-2 text-emerald-200 text-xs">
-                {data.type.charAt(0).toUpperCase() + data.type.slice(1)}: {data.item.name}
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Supporting Metrics - Essential Counts */}
-          <Card className="bg-gradient-to-br from-blue-50 via-white to-blue-50 border-blue-200 shadow-lg">
-            <CardContent className="p-4">
-              <div className="mb-4">
-                <h3 className="text-blue-800 font-semibold mb-3 flex items-center gap-2">
-                  <Users className="w-4 h-4" />
-                  Member Counts
-                </h3>
-              </div>
-              <div className="space-y-3">
-                <div className="flex justify-between items-center p-3 bg-white rounded-lg border-l-4 border-blue-400">
-                  <span className="text-sm font-medium text-slate-700">Total Members</span>
-                  <span className="text-lg font-bold text-blue-600">{formatNumber(summary.totalMembers)}</span>
-                </div>
-                <div className="flex justify-between items-center p-3 bg-white rounded-lg border-l-4 border-green-400">
-                  <span className="text-sm font-medium text-slate-700">New Members</span>
-                  <span className="text-lg font-bold text-green-600">{formatNumber(summary.newMembers)}</span>
-                </div>
-                <div className="flex justify-between items-center p-3 bg-white rounded-lg border-l-4 border-emerald-400">
-                  <span className="text-sm font-medium text-slate-700">Converted</span>
-                  <span className="text-lg font-bold text-emerald-600">{formatNumber(summary.convertedMembers)}</span>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Supporting Metrics - Key Rates */}
-          <Card className="bg-gradient-to-br from-purple-50 via-white to-purple-50 border-purple-200 shadow-lg">
-            <CardContent className="p-4">
-              <div className="mb-4">
-                <h3 className="text-purple-800 font-semibold mb-3 flex items-center gap-2">
-                  <Target className="w-4 h-4" />
-                  Performance Rates
-                </h3>
-              </div>
-              <div className="space-y-3">
-                <div className="flex justify-between items-center p-3 bg-white rounded-lg border-l-4 border-purple-400">
-                  <span className="text-sm font-medium text-slate-700">Conversion Rate</span>
-                  <span className="text-lg font-bold text-purple-600">{summary.conversionRate.toFixed(1)}%</span>
-                </div>
-                <div className="flex justify-between items-center p-3 bg-white rounded-lg border-l-4 border-pink-400">
-                  <span className="text-sm font-medium text-slate-700">Retention Rate</span>
-                  <span className="text-lg font-bold text-pink-600">{summary.retentionRate.toFixed(1)}%</span>
-                </div>
-                <div className="flex justify-between items-center p-3 bg-white rounded-lg border-l-4 border-orange-400">
-                  <span className="text-sm font-medium text-slate-700">Average LTV</span>
-                  <span className="text-lg font-bold text-orange-600">{formatCurrency(summary.avgLTV)}</span>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      );
-    }
-
-    // For other types, show the general overview
-    return (
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+    return <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <Card className="bg-gradient-to-br from-blue-500 to-blue-600 text-white border-0 shadow-lg">
           <CardContent className="p-4">
             <div className="flex items-center justify-between mb-2">
@@ -205,21 +88,21 @@ export const ClientConversionDrillDownModalV3: React.FC<ClientConversionDrillDow
           <CardContent className="p-4">
             <div className="flex items-center justify-between mb-2">
               <Target className="w-5 h-5 text-green-100" />
-              <Badge className="bg-white/20 text-white border-0">Rate</Badge>
+              <Badge className="bg-white/20 text-white border-0">New</Badge>
             </div>
-            <div className="text-2xl font-bold">{summary.conversionRate.toFixed(1)}%</div>
-            <div className="text-green-100 text-sm">Conversion Rate</div>
+            <div className="text-2xl font-bold">{formatNumber(summary.newMembers)}</div>
+            <div className="text-green-100 text-sm">New Members</div>
           </CardContent>
         </Card>
 
         <Card className="bg-gradient-to-br from-purple-500 to-purple-600 text-white border-0 shadow-lg">
           <CardContent className="p-4">
             <div className="flex items-center justify-between mb-2">
-              <Trophy className="w-5 h-5 text-purple-100" />
+              <TrendingUp className="w-5 h-5 text-purple-100" />
               <Badge className="bg-white/20 text-white border-0">Rate</Badge>
             </div>
-            <div className="text-2xl font-bold">{(summary.retentionRate || 0).toFixed(1)}%</div>
-            <div className="text-purple-100 text-sm">Retention Rate</div>
+            <div className="text-2xl font-bold">{summary.conversionRate.toFixed(1)}%</div>
+            <div className="text-purple-100 text-sm">Conversion Rate</div>
           </CardContent>
         </Card>
 
@@ -227,63 +110,13 @@ export const ClientConversionDrillDownModalV3: React.FC<ClientConversionDrillDow
           <CardContent className="p-4">
             <div className="flex items-center justify-between mb-2">
               <DollarSign className="w-5 h-5 text-orange-100" />
-              <Badge className="bg-white/20 text-white border-0">Value</Badge>
+              <Badge className="bg-white/20 text-white border-0">LTV</Badge>
             </div>
             <div className="text-2xl font-bold">{formatCurrency(summary.avgLTV)}</div>
             <div className="text-orange-100 text-sm">Avg LTV</div>
           </CardContent>
         </Card>
-
-        <Card className="bg-gradient-to-br from-teal-500 to-teal-600 text-white border-0 shadow-lg">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between mb-2">
-              <BarChart3 className="w-5 h-5 text-teal-100" />
-              <Badge className="bg-white/20 text-white border-0">Avg</Badge>
-            </div>
-            <div className="text-2xl font-bold">{(summary.classAverage || 0).toFixed(1)}</div>
-            <div className="text-teal-100 text-sm">Class Average</div>
-          </CardContent>
-        </Card>
-
-        {/* Additional cards for ranking type */}
-        {type === 'ranking' && (
-          <>
-            <Card className="bg-gradient-to-br from-indigo-500 to-indigo-600 text-white border-0 shadow-lg">
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between mb-2">
-                  <Calendar className="w-5 h-5 text-indigo-100" />
-                  <Badge className="bg-white/20 text-white border-0">Total</Badge>
-                </div>
-                <div className="text-2xl font-bold">{formatNumber(summary.totalSessions || 0)}</div>
-                <div className="text-indigo-100 text-sm">Total Sessions</div>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-gradient-to-br from-pink-500 to-pink-600 text-white border-0 shadow-lg">
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between mb-2">
-                  <Activity className="w-5 h-5 text-pink-100" />
-                  <Badge className="bg-white/20 text-white border-0">Score</Badge>
-                </div>
-                <div className="text-2xl font-bold">{(summary.efficiencyScore || 0).toFixed(0)}</div>
-                <div className="text-pink-100 text-sm">Efficiency Score</div>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-gradient-to-br from-cyan-500 to-cyan-600 text-white border-0 shadow-lg">
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between mb-2">
-                  <TrendingUp className="w-5 h-5 text-cyan-100" />
-                  <Badge className="bg-white/20 text-white border-0">Growth</Badge>
-                </div>
-                <div className="text-2xl font-bold">{(summary.growthRate || 0).toFixed(1)}%</div>
-                <div className="text-cyan-100 text-sm">Growth Rate</div>
-              </CardContent>
-            </Card>
-          </>
-        )}
-      </div>
-    );
+      </div>;
   };
   const renderClientTable = () => {
     if (clients.length === 0) {
@@ -377,303 +210,25 @@ export const ClientConversionDrillDownModalV3: React.FC<ClientConversionDrillDow
         </DialogHeader>
         
         <div className="pt-6 space-y-8">
-          {/* Metric Cards Section */}
-          <div className="space-y-4">
-            <div className="flex items-center gap-3 mb-6">
-              <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-500 rounded-lg flex items-center justify-center">
-                <BarChart3 className="w-4 h-4 text-white" />
-              </div>
-              <h3 className="text-xl font-semibold text-slate-800">Performance Overview</h3>
-              <div className="flex-1 h-px bg-gradient-to-r from-slate-300 to-transparent"></div>
-            </div>
-            {renderMetricCards()}
-          </div>
+          {/* Metric Cards */}
+          {renderMetricCards()}
 
           {/* Main Content Tabs */}
-          <Tabs defaultValue={type === 'ranking' ? 'ranking' : 'overview'} className="w-full">
-            <div className="flex items-center gap-3 mb-6">
-              <div className="w-8 h-8 bg-gradient-to-r from-emerald-500 to-teal-500 rounded-lg flex items-center justify-center">
-                <Users className="w-4 h-4 text-white" />
-              </div>
-              <h3 className="text-xl font-semibold text-slate-800">Detailed Analysis</h3>
-              <div className="flex-1 h-px bg-gradient-to-r from-slate-300 to-transparent"></div>
-            </div>
-            <TabsList className={`grid w-full ${type === 'ranking' ? 'grid-cols-4' : 'grid-cols-3'} bg-gradient-to-r from-slate-100 to-slate-200 p-1 rounded-xl shadow-inner`}>
-              {type === 'ranking' && (
-                <TabsTrigger value="ranking" className="gap-2 data-[state=active]:bg-white data-[state=active]:shadow-md data-[state=active]:text-slate-900 text-slate-600 font-medium transition-all duration-200">
-                  <Trophy className="w-4 h-4" />
-                  Ranking Details
-                </TabsTrigger>
-              )}
-              <TabsTrigger value="overview" className="gap-2 data-[state=active]:bg-white data-[state=active]:shadow-md data-[state=active]:text-slate-900 text-slate-600 font-medium transition-all duration-200">
+          <Tabs defaultValue="overview" className="w-full">
+            <TabsList className="grid w-full grid-cols-3 bg-slate-100">
+              <TabsTrigger value="overview" className="gap-2">
                 <Star className="w-4 h-4" />
                 Overview
               </TabsTrigger>
-              <TabsTrigger value="clients" className="gap-2 data-[state=active]:bg-white data-[state=active]:shadow-md data-[state=active]:text-slate-900 text-slate-600 font-medium transition-all duration-200">
+              <TabsTrigger value="clients" className="gap-2">
                 <Users className="w-4 h-4" />
                 Client Details
               </TabsTrigger>
-              <TabsTrigger value="insights" className="gap-2 data-[state=active]:bg-white data-[state=active]:shadow-md data-[state=active]:text-slate-900 text-slate-600 font-medium transition-all duration-200">
+              <TabsTrigger value="insights" className="gap-2">
                 <Zap className="w-4 h-4" />
                 Insights
               </TabsTrigger>
             </TabsList>
-            
-            {type === 'ranking' && (
-              <TabsContent value="ranking" className="space-y-6 mt-6">
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  {/* Performance Details */}
-                  <Card className="bg-gradient-to-br from-blue-50 via-white to-blue-50 border-blue-200 shadow-lg">
-                    <CardHeader className="pb-4">
-                      <CardTitle className="text-blue-800 flex items-center gap-3">
-                        <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-blue-600 rounded-lg flex items-center justify-center">
-                          <BarChart3 className="w-4 h-4 text-white" />
-                        </div>
-                        Performance Metrics
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-3">
-                      {data.type === 'trainer' && (
-                        <>
-                          <div className="flex justify-between items-center p-4 bg-white rounded-xl border-l-4 border-blue-400 shadow-sm hover:shadow-md transition-shadow">
-                            <span className="font-medium text-slate-700">Total Sessions</span>
-                            <span className="text-xl font-bold text-blue-600">{data.item.totalSessions || 0}</span>
-                          </div>
-                          <div className="flex justify-between items-center p-4 bg-white rounded-xl border-l-4 border-orange-400 shadow-sm hover:shadow-md transition-shadow">
-                            <span className="font-medium text-slate-700">Empty Sessions</span>
-                            <span className="text-xl font-bold text-orange-600">{data.item.totalEmptySessions || 0}</span>
-                          </div>
-                          <div className="flex justify-between items-center p-4 bg-white rounded-xl border-l-4 border-green-400 shadow-sm hover:shadow-md transition-shadow">
-                            <span className="font-medium text-slate-700">Class Average</span>
-                            <span className="text-xl font-bold text-green-600">{(data.item.classAverage || 0).toFixed(1)}</span>
-                          </div>
-                          <div className="flex justify-between items-center p-4 bg-white rounded-xl border-l-4 border-purple-400 shadow-sm hover:shadow-md transition-shadow">
-                            <span className="font-medium text-slate-700">Conversion Rate</span>
-                            <span className="text-xl font-bold text-purple-600">{(data.item.conversionRate || 0).toFixed(1)}%</span>
-                          </div>
-                          <div className="flex justify-between items-center p-4 bg-white rounded-xl border-l-4 border-red-400 shadow-sm hover:shadow-md transition-shadow">
-                            <span className="font-medium text-slate-700">Empty Class Rate</span>
-                            <span className="text-xl font-bold text-red-600">{(data.item.emptyClassRate || 0).toFixed(1)}%</span>
-                          </div>
-                        </>
-                      )}
-                      
-                      {data.type === 'location' && (
-                        <>
-                          <div className="flex justify-between items-center p-4 bg-white rounded-xl border-l-4 border-blue-400 shadow-sm hover:shadow-md transition-shadow">
-                            <span className="font-medium text-slate-700">Total Sessions</span>
-                            <span className="text-xl font-bold text-blue-600">{data.item.totalSessions || 0}</span>
-                          </div>
-                          <div className="flex justify-between items-center p-4 bg-white rounded-xl border-l-4 border-green-400 shadow-sm hover:shadow-md transition-shadow">
-                            <span className="font-medium text-slate-700">Total Customers</span>
-                            <span className="text-xl font-bold text-green-600">{data.item.totalCustomers || 0}</span>
-                          </div>
-                          <div className="flex justify-between items-center p-4 bg-white rounded-xl border-l-4 border-purple-400 shadow-sm hover:shadow-md transition-shadow">
-                            <span className="font-medium text-slate-700">Class Average</span>
-                            <span className="text-xl font-bold text-purple-600">{(data.item.classAverage || 0).toFixed(1)}</span>
-                          </div>
-                          <div className="flex justify-between items-center p-4 bg-white rounded-xl border-l-4 border-orange-400 shadow-sm hover:shadow-md transition-shadow">
-                            <span className="font-medium text-slate-700">Empty Sessions</span>
-                            <span className="text-xl font-bold text-orange-600">{data.item.totalEmptySessions || 0}</span>
-                          </div>
-                        </>
-                      )}
-                      
-                      {data.type === 'membership' && (
-                        <>
-                          <div className="flex justify-between items-center p-4 bg-white rounded-xl border-l-4 border-blue-400 shadow-sm hover:shadow-md transition-shadow">
-                            <span className="font-medium text-slate-700">Total Clients</span>
-                            <span className="text-xl font-bold text-blue-600">{data.item.totalClients || 0}</span>
-                          </div>
-                          <div className="flex justify-between items-center p-4 bg-white rounded-xl border-l-4 border-green-400 shadow-sm hover:shadow-md transition-shadow">
-                            <span className="font-medium text-slate-700">New Members</span>
-                            <span className="text-xl font-bold text-green-600">{data.item.newMembers || 0}</span>
-                          </div>
-                          <div className="flex justify-between items-center p-4 bg-white rounded-xl border-l-4 border-purple-400 shadow-sm hover:shadow-md transition-shadow">
-                            <span className="font-medium text-slate-700">Conversion Rate</span>
-                            <span className="text-xl font-bold text-purple-600">{(data.item.conversionRate || 0).toFixed(1)}%</span>
-                          </div>
-                          <div className="flex justify-between items-center p-4 bg-white rounded-xl border-l-4 border-orange-400 shadow-sm hover:shadow-md transition-shadow">
-                            <span className="font-medium text-slate-700">Average LTV</span>
-                            <span className="text-xl font-bold text-orange-600">{formatCurrency(data.item.avgLTV || 0)}</span>
-                          </div>
-                        </>
-                      )}
-                    </CardContent>
-                  </Card>
-
-                  {/* Ranking Context */}
-                  <Card className="bg-gradient-to-br from-emerald-50 via-white to-emerald-50 border-emerald-200 shadow-lg">
-                    <CardHeader className="pb-4">
-                      <CardTitle className="text-emerald-800 flex items-center gap-3">
-                        <div className="w-8 h-8 bg-gradient-to-r from-emerald-500 to-emerald-600 rounded-lg flex items-center justify-center">
-                          <Target className="w-4 h-4 text-white" />
-                        </div>
-                        Ranking Context
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      <div className="p-4 bg-white rounded-lg border-l-4 border-emerald-400">
-                        <h4 className="font-semibold text-emerald-800 mb-2">Selected Metric</h4>
-                        <p className="text-emerald-600">{data.metric}</p>
-                      </div>
-                      
-                      <div className="p-4 bg-white rounded-lg border-l-4 border-blue-400">
-                        <h4 className="font-semibold text-blue-800 mb-2">Type</h4>
-                        <p className="text-blue-600 capitalize">{data.type}</p>
-                      </div>
-                      
-                      <div className="p-4 bg-white rounded-lg border-l-4 border-purple-400">
-                        <h4 className="font-semibold text-purple-800 mb-2">Performance Score</h4>
-                        <div className="text-2xl font-bold text-purple-600">
-                          {data.metric === 'avgLTV' ? formatCurrency(data.item[data.metric] || 0) : 
-                           data.metric.includes('Rate') || data.metric.includes('Conversion') ? 
-                           `${(data.item[data.metric] || 0).toFixed(1)}%` : 
-                           formatNumber(data.item[data.metric] || 0)}
-                        </div>
-                      </div>
-
-                      {data.relatedPayroll && data.relatedPayroll.length > 0 && (
-                        <div className="p-4 bg-white rounded-lg border-l-4 border-orange-400">
-                          <h4 className="font-semibold text-orange-800 mb-2">Related Data</h4>
-                          <p className="text-orange-600 text-sm">
-                            {data.relatedPayroll.length} payroll records found for this {data.type}
-                          </p>
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                </div>
-
-                {/* Transaction-Level Details */}
-                <Card className="bg-gradient-to-br from-slate-50 to-slate-100 border-slate-200">
-                  <CardHeader>
-                    <CardTitle className="text-slate-800 flex items-center gap-2">
-                      <TableIcon className="w-5 h-5" />
-                      Transaction-Level Details
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                      {/* Client Data */}
-                      {data.relatedClients && data.relatedClients.length > 0 && (
-                        <div>
-                          <h4 className="font-semibold text-slate-700 mb-3 flex items-center gap-2">
-                            <Users className="w-4 h-4" />
-                            Client Records ({data.relatedClients.length})
-                          </h4>
-                          <div className="bg-white rounded-lg border overflow-hidden">
-                            <div className="overflow-y-auto max-h-64">
-                              <table className="w-full text-sm">
-                                <thead className="bg-slate-100 border-b">
-                                  <tr>
-                                    <th className="text-left p-2 font-medium text-slate-700">Name</th>
-                                    <th className="text-left p-2 font-medium text-slate-700">Status</th>
-                                    <th className="text-right p-2 font-medium text-slate-700">LTV</th>
-                                  </tr>
-                                </thead>
-                                <tbody>
-                                  {data.relatedClients.slice(0, 10).map((client, index) => (
-                                    <tr key={index} className="border-b hover:bg-slate-50">
-                                      <td className="p-2 text-slate-800">
-                                        {client.memberName || client.memberId || 'Unknown'}
-                                      </td>
-                                      <td className="p-2">
-                                        <div className="flex flex-col gap-1">
-                                          {client.conversionStatus && (
-                                            <span className={`text-xs px-2 py-1 rounded-full ${
-                                              client.conversionStatus.includes('Converted') 
-                                                ? 'bg-green-100 text-green-700' 
-                                                : 'bg-gray-100 text-gray-700'
-                                            }`}>
-                                              {client.conversionStatus}
-                                            </span>
-                                          )}
-                                          {client.isNew && String(client.isNew).includes('New') && (
-                                            <span className="text-xs px-2 py-1 rounded-full bg-blue-100 text-blue-700">
-                                              New
-                                            </span>
-                                          )}
-                                        </div>
-                                      </td>
-                                      <td className="p-2 text-right font-medium">
-                                        {formatCurrency(client.ltv || 0)}
-                                      </td>
-                                    </tr>
-                                  ))}
-                                </tbody>
-                              </table>
-                            </div>
-                            {data.relatedClients.length > 10 && (
-                              <div className="p-2 bg-slate-50 border-t text-center text-xs text-slate-600">
-                                Showing 10 of {data.relatedClients.length} records
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Payroll Data */}
-                      {data.relatedPayroll && data.relatedPayroll.length > 0 && (
-                        <div>
-                          <h4 className="font-semibold text-slate-700 mb-3 flex items-center gap-2">
-                            <Calendar className="w-4 h-4" />
-                            Payroll Records ({data.relatedPayroll.length})
-                          </h4>
-                          <div className="bg-white rounded-lg border overflow-hidden">
-                            <div className="overflow-y-auto max-h-64">
-                              <table className="w-full text-sm">
-                                <thead className="bg-slate-100 border-b">
-                                  <tr>
-                                    <th className="text-left p-2 font-medium text-slate-700">Period</th>
-                                    <th className="text-center p-2 font-medium text-slate-700">Sessions</th>
-                                    <th className="text-center p-2 font-medium text-slate-700">Customers</th>
-                                    <th className="text-right p-2 font-medium text-slate-700">Avg</th>
-                                  </tr>
-                                </thead>
-                                <tbody>
-                                  {data.relatedPayroll.slice(0, 10).map((payroll, index) => (
-                                    <tr key={index} className="border-b hover:bg-slate-50">
-                                      <td className="p-2 text-slate-800">
-                                        {payroll.monthYear || 'Unknown'}
-                                      </td>
-                                      <td className="p-2 text-center">
-                                        <div className="flex flex-col">
-                                          <span className="font-medium">{payroll.totalSessions || 0}</span>
-                                          {payroll.totalEmptySessions > 0 && (
-                                            <span className="text-xs text-orange-600">
-                                              {payroll.totalEmptySessions} empty
-                                            </span>
-                                          )}
-                                        </div>
-                                      </td>
-                                      <td className="p-2 text-center font-medium">
-                                        {payroll.totalCustomers || 0}
-                                      </td>
-                                      <td className="p-2 text-right font-medium">
-                                        {payroll.totalNonEmptySessions > 0 
-                                          ? ((payroll.totalCustomers || 0) / payroll.totalNonEmptySessions).toFixed(1)
-                                          : '0.0'
-                                        }
-                                      </td>
-                                    </tr>
-                                  ))}
-                                </tbody>
-                              </table>
-                            </div>
-                            {data.relatedPayroll.length > 10 && (
-                              <div className="p-2 bg-slate-50 border-t text-center text-xs text-slate-600">
-                                Showing 10 of {data.relatedPayroll.length} records
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              </TabsContent>
-            )}
             
             <TabsContent value="overview" className="space-y-6">
               <Card className="bg-gradient-to-br from-indigo-50 to-indigo-100 border-indigo-200">

@@ -264,20 +264,6 @@ export const TrainerPerformanceDetailTable: React.FC<TrainerPerformanceDetailTab
     }));
   };
 
-  // Calculate totals for footer
-  const footerData = processedTableData.length > 0 ? {
-    trainerName: `${processedTableData.length} Trainers Total`,
-    totalSessions: processedTableData.reduce((sum, row) => sum + row.totalSessions, 0),
-    totalCustomers: processedTableData.reduce((sum, row) => sum + row.totalCustomers, 0),
-    totalRevenue: processedTableData.reduce((sum, row) => sum + row.totalRevenue, 0),
-    avgClassSize: (processedTableData.reduce((sum, row) => sum + row.avgClassSize, 0) / processedTableData.length),
-    revenuePerSession: (processedTableData.reduce((sum, row) => sum + row.revenuePerSession, 0) / processedTableData.length),
-    topFormat: `${processedTableData.filter(row => row.topFormat === 'Cycle').length}C/${processedTableData.filter(row => row.topFormat === 'Barre').length}B/${processedTableData.filter(row => row.topFormat === 'Strength').length}S`,
-    fillRate: (processedTableData.reduce((sum, row) => sum + row.fillRate, 0) / processedTableData.length),
-    conversionRate: (processedTableData.reduce((sum, row) => sum + row.conversionRate, 0) / processedTableData.length),
-    performanceRating: `${processedTableData.filter(row => row.performanceRating === 'Excellent').length}E/${processedTableData.filter(row => row.performanceRating === 'Good').length}G/${processedTableData.filter(row => row.performanceRating === 'Average').length}A`
-  } : null;
-
   return (
     <Card className="bg-gradient-to-br from-white via-slate-50/30 to-white border-0 shadow-xl">
       <CardHeader className="border-b border-gray-100 bg-gradient-to-r from-purple-600 to-indigo-600 text-white">
@@ -295,8 +281,7 @@ export const TrainerPerformanceDetailTable: React.FC<TrainerPerformanceDetailTab
             columns={columns}
             onRowClick={handleRowClick}
             headerGradient="from-purple-600 to-indigo-600"
-            showFooter={true}
-            footerData={footerData}
+            showFooter={false}
             stickyHeader={true}
           />
       </CardContent>
