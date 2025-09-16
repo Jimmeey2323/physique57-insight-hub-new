@@ -399,7 +399,10 @@ export const ClientConversionSimplifiedRanks: React.FC<ClientConversionSimplifie
                   {currentOption?.type === 'membership' && (
                     <>
                       <Badge variant="outline" className="text-xs border-green-200 text-green-700">
-                        LTV: {formatCurrency(item.avgLTV || 0)}
+                        Avg LTV: {formatCurrency(item.avgLTV || 0)}
+                      </Badge>
+                      <Badge variant="outline" className="text-xs border-blue-200 text-blue-700">
+                        Total: {formatCurrency(item.totalLTV || 0)}
                       </Badge>
                       <Badge variant="outline" className="text-xs border-orange-200 text-orange-700">
                         Visits: {(item.avgVisitsPerClient || 0).toFixed(1)}

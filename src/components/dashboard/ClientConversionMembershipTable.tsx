@@ -120,6 +120,12 @@ export const ClientConversionMembershipTable: React.FC<ClientConversionMembershi
       header: 'Avg LTV',
       align: 'right' as const,
       render: (value: number) => <span className="text-xs font-semibold">{formatCurrency(value)}</span>
+    },
+    {
+      key: 'totalLTV' as const,
+      header: 'Total LTV',
+      align: 'right' as const,
+      render: (value: number) => <span className="text-xs font-semibold text-green-600">{formatCurrency(value)}</span>
     }
   ];
 
@@ -132,6 +138,7 @@ export const ClientConversionMembershipTable: React.FC<ClientConversionMembershi
     conversionRate: 0,
     retained: membershipData.reduce((sum, row) => sum + row.retained, 0),
     retentionRate: 0,
+    totalLTV: membershipData.reduce((sum, row) => sum + row.totalLTV, 0),
     avgLTV: membershipData.reduce((sum, row) => sum + row.totalLTV, 0) / Math.max(membershipData.reduce((sum, row) => sum + row.totalMembers, 0), 1)
   };
   totals.conversionRate = totals.newMembers > 0 ? (totals.converted / totals.newMembers) * 100 : 0;

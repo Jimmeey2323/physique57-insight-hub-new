@@ -138,7 +138,7 @@ export const ClientConversionMetricCards: React.FC<ClientConversionMetricCardsPr
       value: formatCurrency(avgLTV),
       icon: DollarSign,
       gradient: 'from-pink-500 to-rose-600',
-      description: 'Average lifetime value',
+      description: `Total: ${formatCurrency(totalLTV)}`,
       change: '+7.2%',
       isPositive: true,
       metricType: 'avg_ltv',

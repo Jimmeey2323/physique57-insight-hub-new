@@ -230,6 +230,14 @@ export const ClientConversionMonthOnMonthTable: React.FC<ClientConversionMonthOn
       )
     },
     {
+      key: 'totalLTV',
+      header: 'Total LTV',
+      align: 'right' as const,
+      render: (value: number) => (
+        <span className="text-base font-bold text-green-600">{formatCurrency(value)}</span>
+      )
+    },
+    {
       key: 'avgConversionInterval',
       header: 'Avg Conv Days',
       align: 'center' as const,

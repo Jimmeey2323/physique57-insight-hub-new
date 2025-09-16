@@ -236,6 +236,18 @@ export const ClientConversionYearOnYearTable: React.FC<ClientConversionYearOnYea
       render: (value: number) => <span className="text-base font-bold text-slate-600">{formatCurrency(value || 0)}</span>
     },
     {
+      key: 'currentTotalLTV' as const,
+      header: `${new Date().getFullYear()} Total LTV`,
+      align: 'right' as const,
+      render: (value: number) => <span className="text-base font-bold text-green-600">{formatCurrency(value || 0)}</span>
+    },
+    {
+      key: 'previousTotalLTV' as const,
+      header: `${new Date().getFullYear() - 1} Total LTV`,
+      align: 'right' as const,
+      render: (value: number) => <span className="text-base font-bold text-gray-600">{formatCurrency(value || 0)}</span>
+    },
+    {
       key: 'avgLTVGrowth' as const,
       header: 'LTV Growth %',
       align: 'center' as const,

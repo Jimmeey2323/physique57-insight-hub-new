@@ -227,6 +227,7 @@ export const ClientConversionMonthOnMonthByTypeTable = ({
       conversionRate,
       retentionRate,
       avgLTV,
+      totalLTV: totals.totalLTV,
       avgConversionDays,
       avgVisits
     };
@@ -256,6 +257,7 @@ export const ClientConversionMonthOnMonthByTypeTable = ({
                 <TableHead className="font-bold text-white text-xs px-3 text-center min-w-[80px]">Converted</TableHead>
                 <TableHead className="font-bold text-white text-xs px-3 text-center min-w-[80px]">Conversion %</TableHead>
                 <TableHead className="font-bold text-white text-xs px-3 text-center min-w-[80px]">Avg LTV</TableHead>
+                <TableHead className="font-bold text-white text-xs px-3 text-center min-w-[80px]">Total LTV</TableHead>
                 <TableHead className="font-bold text-white text-xs px-3 text-center min-w-[80px]">Avg Conv Days</TableHead>
                 <TableHead className="font-bold text-white text-xs px-3 text-center min-w-[80px]">Avg Visits</TableHead>
               </TableRow>
@@ -283,6 +285,7 @@ export const ClientConversionMonthOnMonthByTypeTable = ({
                     </span>
                   </TableCell>
                   <TableCell className="text-xs px-3 text-right font-semibold text-emerald-600">{formatCurrency(row.avgLTV)}</TableCell>
+                  <TableCell className="text-xs px-3 text-right font-semibold text-green-600">{formatCurrency(row.totalLTV)}</TableCell>
                   <TableCell className="text-xs px-3 text-center font-medium">{row.avgConversionDays.toFixed(0)} days</TableCell>
                   <TableCell className="text-xs px-3 text-center font-medium">{row.avgVisits.toFixed(1)}</TableCell>
                 </TableRow>)}
@@ -309,6 +312,7 @@ export const ClientConversionMonthOnMonthByTypeTable = ({
                   </span>
                 </TableCell>
                 <TableCell className="text-xs px-3 text-right font-bold text-emerald-600">{formatCurrency(totalsRow.avgLTV)}</TableCell>
+                <TableCell className="text-xs px-3 text-right font-bold text-green-600">{formatCurrency(totalsRow.totalLTV)}</TableCell>
                 <TableCell className="text-xs px-3 text-center font-bold">{totalsRow.avgConversionDays.toFixed(0)} days</TableCell>
                 <TableCell className="text-xs px-3 text-center font-bold">{totalsRow.avgVisits.toFixed(1)}</TableCell>
               </TableRow>

@@ -163,6 +163,7 @@ export const ClientConversionDrillDownModalV3: React.FC<ClientConversionDrillDow
             </div>
             <div className="text-2xl font-bold">{formatCurrency(summary.avgLTV)}</div>
             <div className="text-orange-100 text-sm">Avg LTV</div>
+            <div className="text-orange-200 text-xs mt-1">Total: {formatCurrency(summary.totalLTV)}</div>
           </CardContent>
         </Card>
       </div>;
