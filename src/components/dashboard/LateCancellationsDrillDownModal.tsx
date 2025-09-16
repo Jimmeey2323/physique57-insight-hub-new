@@ -21,6 +21,11 @@ export const LateCancellationsDrillDownModal: React.FC<LateCancellationsDrillDow
 }) => {
   if (!data) return null;
 
+  // Add safety checks for data structure
+  const safeData = data?.data || {};
+  const safeRawData = data?.rawData || [];
+  const dataType = data?.type || 'unknown';
+
   const renderMemberDetails = () => (
     <div className="space-y-6">
       <Card>
@@ -33,19 +38,19 @@ export const LateCancellationsDrillDownModal: React.FC<LateCancellationsDrillDow
         <CardContent className="grid grid-cols-2 gap-4">
           <div>
             <p className="text-sm text-gray-600">Member Name</p>
-            <p className="font-semibold">{data.data.memberName}</p>
+            <p className="font-semibold">{safeData.memberName || 'N/A'}</p>
           </div>
           <div>
             <p className="text-sm text-gray-600">Email</p>
-            <p className="font-semibold">{data.data.email}</p>
+            <p className="font-semibold">{safeData.email || 'N/A'}</p>
           </div>
           <div>
             <p className="text-sm text-gray-600">Member ID</p>
-            <p className="font-semibold">{data.data.memberId}</p>
+            <p className="font-semibold">{safeData.memberId || 'N/A'}</p>
           </div>
           <div>
             <p className="text-sm text-gray-600">Total Cancellations</p>
-            <Badge variant="destructive">{data.data.count}</Badge>
+            <Badge variant="destructive">{safeData.count || 0}</Badge>
           </div>
         </CardContent>
       </Card>
@@ -66,12 +71,12 @@ export const LateCancellationsDrillDownModal: React.FC<LateCancellationsDrillDow
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {(data.rawData || []).map((session: any, index: number) => (
+                {safeRawData.map((session: any, index: number) => (
                   <TableRow key={index}>
-                    <TableCell>{session.sessionName}</TableCell>
-                    <TableCell>{session.time}</TableCell>
-                    <TableCell>{session.location}</TableCell>
-                    <TableCell>{session.teacherName}</TableCell>
+                    <TableCell>{session?.sessionName || 'N/A'}</TableCell>
+                    <TableCell>{session?.time || 'N/A'}</TableCell>
+                    <TableCell>{session?.location || 'N/A'}</TableCell>
+                    <TableCell>{session?.teacherName || 'N/A'}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -94,27 +99,27 @@ export const LateCancellationsDrillDownModal: React.FC<LateCancellationsDrillDow
         <CardContent className="grid grid-cols-2 gap-4">
           <div>
             <p className="text-sm text-gray-600">Class Type</p>
-            <p className="font-semibold">{data.data.className}</p>
+            <p className="font-semibold">{safeData.className || 'N/A'}</p>
           </div>
           <div>
             <p className="text-sm text-gray-600">Category</p>
-            <Badge variant="secondary">{data.data.category}</Badge>
+            <Badge variant="secondary">{safeData.category || 'Unknown'}</Badge>
           </div>
           <div>
             <p className="text-sm text-gray-600">Total Cancellations</p>
-            <Badge variant="destructive">{formatNumber(data.data.count)}</Badge>
+            <Badge variant="destructive">{formatNumber(safeData.count || 0)}</Badge>
           </div>
           <div>
             <p className="text-sm text-gray-600">Unique Members</p>
-            <p className="font-semibold">{formatNumber(data.data.uniqueMembers)}</p>
+            <p className="font-semibold">{formatNumber(safeData.uniqueMembers || 0)}</p>
           </div>
           <div>
             <p className="text-sm text-gray-600">Peak Time</p>
-            <Badge variant="outline">{data.data.peakTime}</Badge>
+            <Badge variant="outline">{safeData.peakTime || 'N/A'}</Badge>
           </div>
           <div>
             <p className="text-sm text-gray-600">Average Duration</p>
-            <p className="font-semibold">{data.data.avgDuration} min</p>
+            <p className="font-semibold">{safeData.avgDuration || 0} min</p>
           </div>
         </CardContent>
       </Card>
@@ -135,12 +140,12 @@ export const LateCancellationsDrillDownModal: React.FC<LateCancellationsDrillDow
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {(data.rawData || []).slice(0, 10).map((cancellation: LateCancellationsData, index: number) => (
+                {safeRawData.slice(0, 10).map((cancellation: any, index: number) => (
                   <TableRow key={index}>
-                    <TableCell>{cancellation.firstName} {cancellation.lastName}</TableCell>
-                    <TableCell>{new Date(cancellation.dateIST).toLocaleDateString()}</TableCell>
-                    <TableCell>{cancellation.time}</TableCell>
-                    <TableCell>{cancellation.location}</TableCell>
+                    <TableCell>{(cancellation?.firstName || '') + ' ' + (cancellation?.lastName || '')}</TableCell>
+                    <TableCell>{cancellation?.dateIST ? new Date(cancellation.dateIST).toLocaleDateString() : 'N/A'}</TableCell>
+                    <TableCell>{cancellation?.time || 'N/A'}</TableCell>
+                    <TableCell>{cancellation?.location || 'N/A'}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -156,26 +161,26 @@ export const LateCancellationsDrillDownModal: React.FC<LateCancellationsDrillDow
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Card>
           <CardContent className="p-4 text-center">
-            <div className="text-2xl font-bold text-red-600">{formatNumber(data.totalCancellations)}</div>
+            <div className="text-2xl font-bold text-red-600">{formatNumber(data?.totalCancellations || 0)}</div>
             <div className="text-sm text-gray-600">Total Cancellations</div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4 text-center">
-            <div className="text-2xl font-bold text-blue-600">{formatNumber(data.uniqueMembers)}</div>
+            <div className="text-2xl font-bold text-blue-600">{formatNumber(data?.uniqueMembers || 0)}</div>
             <div className="text-sm text-gray-600">Unique Members</div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4 text-center">
-            <div className="text-2xl font-bold text-green-600">{formatNumber(data.uniqueLocations)}</div>
+            <div className="text-2xl font-bold text-green-600">{formatNumber(data?.uniqueLocations || 0)}</div>
             <div className="text-sm text-gray-600">Locations</div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4 text-center">
             <div className="text-2xl font-bold text-purple-600">
-              {data.uniqueMembers > 0 ? (data.totalCancellations / data.uniqueMembers).toFixed(1) : '0'}
+              {(data?.uniqueMembers || 0) > 0 ? ((data?.totalCancellations || 0) / (data?.uniqueMembers || 1)).toFixed(1) : '0'}
             </div>
             <div className="text-sm text-gray-600">Avg per Member</div>
           </CardContent>
@@ -199,13 +204,13 @@ export const LateCancellationsDrillDownModal: React.FC<LateCancellationsDrillDow
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {(data.rawData || []).slice(0, 15).map((item: LateCancellationsData, index: number) => (
+                {safeRawData.slice(0, 15).map((item: any, index: number) => (
                   <TableRow key={index}>
-                    <TableCell>{item.firstName} {item.lastName}</TableCell>
-                    <TableCell>{new Date(item.dateIST).toLocaleDateString()}</TableCell>
-                    <TableCell>{item.cleanedClass}</TableCell>
-                    <TableCell>{item.location}</TableCell>
-                    <TableCell>{item.teacherName}</TableCell>
+                    <TableCell>{(item?.firstName || '') + ' ' + (item?.lastName || '')}</TableCell>
+                    <TableCell>{item?.dateIST ? new Date(item.dateIST).toLocaleDateString() : 'N/A'}</TableCell>
+                    <TableCell>{item?.cleanedClass || 'N/A'}</TableCell>
+                    <TableCell>{item?.location || 'N/A'}</TableCell>
+                    <TableCell>{item?.teacherName || 'N/A'}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -232,9 +237,15 @@ export const LateCancellationsDrillDownModal: React.FC<LateCancellationsDrillDow
         </DialogHeader>
 
         <div className="mt-4">
-          {data.type === 'member' && renderMemberDetails()}
-          {data.type === 'class' && renderClassDetails()}
-          {data.type === 'metric' && renderMetricDetails()}
+          {dataType === 'member' && renderMemberDetails()}
+          {dataType === 'class' && renderClassDetails()}
+          {dataType === 'metric' && renderMetricDetails()}
+          {!['member', 'class', 'metric'].includes(dataType) && (
+            <div className="text-center py-8">
+              <p className="text-gray-500">Unable to display drill-down data</p>
+              <p className="text-sm text-gray-400">Data type: {dataType}</p>
+            </div>
+          )}
         </div>
       </DialogContent>
     </Dialog>

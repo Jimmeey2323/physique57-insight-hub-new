@@ -25,17 +25,18 @@ const locations = [
 
 const getPreviousMonthDateRange = () => {
   const now = new Date();
-  // For testing, let's use current month instead of previous month
-  const firstDayCurrentMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-  const lastDayCurrentMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+  // Get the first day of the previous month
+  const firstDayPreviousMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  // Get the last day of the previous month  
+  const lastDayPreviousMonth = new Date(now.getFullYear(), now.getMonth(), 0);
   
   const formatDate = (date: Date) => {
     return date.toISOString().split('T')[0];
   };
   
   return {
-    start: formatDate(firstDayCurrentMonth),
-    end: formatDate(lastDayCurrentMonth)
+    start: formatDate(firstDayPreviousMonth),
+    end: formatDate(lastDayPreviousMonth)
   };
 };
 

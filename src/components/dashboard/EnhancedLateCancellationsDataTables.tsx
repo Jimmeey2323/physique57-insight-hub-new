@@ -337,13 +337,17 @@ export const EnhancedLateCancellationsDataTables: React.FC<EnhancedLateCancellat
                   key={index} 
                   className="h-[35px] max-h-[35px] hover:bg-gray-50 cursor-pointer transition-colors"
                   onClick={() => {
-                    if (onDrillDown) {
-                      onDrillDown({
-                        type: 'member',
-                        title: `Member: ${member.memberName}`,
-                        data: member,
-                        rawData: member.cancellations || member.sessionDetails
-                      });
+                    try {
+                      if (onDrillDown && member) {
+                        onDrillDown({
+                          type: 'member',
+                          title: `Member: ${member.memberName || 'Unknown'}`,
+                          data: member,
+                          rawData: member.cancellations || member.sessionDetails || []
+                        });
+                      }
+                    } catch (error) {
+                      console.error('Error in drill down:', error);
                     }
                   }}
                 >
@@ -438,13 +442,17 @@ export const EnhancedLateCancellationsDataTables: React.FC<EnhancedLateCancellat
                 key={index} 
                 className="h-[35px] max-h-[35px] hover:bg-gray-50 cursor-pointer transition-colors"
                 onClick={() => {
-                  if (onDrillDown) {
-                    onDrillDown({
-                      type: 'class',
-                      title: `Class Type: ${classType.className}`,
-                      data: classType,
-                      rawData: data.filter(item => item.cleanedClass === classType.className)
-                    });
+                  try {
+                    if (onDrillDown && classType) {
+                      onDrillDown({
+                        type: 'class',
+                        title: `Class Type: ${classType.className || 'Unknown'}`,
+                        data: classType,
+                        rawData: data.filter(item => item.cleanedClass === classType.className) || []
+                      });
+                    }
+                  } catch (error) {
+                    console.error('Error in class drill down:', error);
                   }
                 }}
               >
