@@ -58,18 +58,32 @@ export const ClientConversionDrillDownModalV3: React.FC<ClientConversionDrillDow
 
   // Calculate summary metrics from targeted clients OR use pre-calculated item values for ranking type
   const summary = React.useMemo(() => {
-    // For ranking type, use the pre-calculated values from the item
+    // Always calculate from actual client data first for accuracy
+    const totalMembers = clients.length;
+    const newMembers = clients.filter(c => (c.isNew || '').toLowerCase().includes('new')).length;
+    const convertedMembers = clients.filter(c => (c.conversionStatus || '').toLowerCase().includes('converted')).length;
+    const retainedMembers = clients.filter(c => (c.retentionStatus || '').toLowerCase().includes('retained')).length;
+    const totalLTV = clients.reduce((sum, c) => sum + (c.ltv || 0), 0);
+    const totalConversionSpan = clients.filter(c => c.conversionSpan > 0).reduce((sum, c) => sum + (c.conversionSpan || 0), 0);
+    const clientsWithConversionData = clients.filter(c => c.conversionSpan > 0).length;
+    
+    // Calculate rates from actual client data
+    const calculatedConversionRate = newMembers > 0 ? (convertedMembers / newMembers) * 100 : 0;
+    const calculatedRetentionRate = newMembers > 0 ? (retainedMembers / newMembers) * 100 : 0;
+    const calculatedAvgLTV = totalMembers > 0 ? totalLTV / totalMembers : 0;
+    
+    // For ranking type, use calculated values if we have client data, otherwise fall back to pre-calculated
     if (type === 'ranking' && data.item) {
       return {
-        totalMembers: clients.length,
-        newMembers: data.item.totalNew || 0,
-        convertedMembers: data.item.totalConverted || 0,
-        retainedMembers: data.item.totalRetained || 0,
-        conversionRate: data.item.conversionRate || 0,
-        retentionRate: data.item.retentionRate || 0,
-        avgLTV: data.item.avgLTV || 0,
-        totalLTV: clients.reduce((sum, c) => sum + (c.ltv || 0), 0),
-        avgConversionTime: 0, // Not available in item data
+        totalMembers: totalMembers > 0 ? totalMembers : (data.item.totalClients || data.item.clientCount || 0),
+        newMembers: totalMembers > 0 ? newMembers : (data.item.totalNew || 0),
+        convertedMembers: totalMembers > 0 ? convertedMembers : (data.item.totalConverted || 0),
+        retainedMembers: totalMembers > 0 ? retainedMembers : (data.item.totalRetained || 0),
+        conversionRate: totalMembers > 0 ? calculatedConversionRate : (data.item.conversionRate || 0),
+        retentionRate: totalMembers > 0 ? calculatedRetentionRate : (data.item.retentionRate || 0),
+        avgLTV: totalMembers > 0 ? calculatedAvgLTV : (data.item.avgLTV || 0),
+        totalLTV,
+        avgConversionTime: clientsWithConversionData > 0 ? totalConversionSpan / clientsWithConversionData : 0,
         totalSessions: data.item.totalSessions || 0,
         totalCustomers: data.item.totalCustomers || 0,
         classAverage: data.item.classAverage || 0,
@@ -80,22 +94,15 @@ export const ClientConversionDrillDownModalV3: React.FC<ClientConversionDrillDow
       };
     }
     
-    // Fallback to calculated values from client data
-    const totalMembers = clients.length;
-    const newMembers = clients.filter(c => (c.isNew || '').toLowerCase().includes('new')).length;
-    const convertedMembers = clients.filter(c => (c.conversionStatus || '').toLowerCase().includes('converted')).length;
-    const retainedMembers = clients.filter(c => (c.retentionStatus || '').toLowerCase().includes('retained')).length;
-    const totalLTV = clients.reduce((sum, c) => sum + (c.ltv || 0), 0);
-    const totalConversionSpan = clients.filter(c => c.conversionSpan > 0).reduce((sum, c) => sum + (c.conversionSpan || 0), 0);
-    const clientsWithConversionData = clients.filter(c => c.conversionSpan > 0).length;
+    // For other types, use calculated values
     return {
       totalMembers,
       newMembers,
       convertedMembers,
       retainedMembers,
-      conversionRate: newMembers > 0 ? convertedMembers / newMembers * 100 : 0,
-      retentionRate: totalMembers > 0 ? retainedMembers / totalMembers * 100 : 0,
-      avgLTV: totalMembers > 0 ? totalLTV / totalMembers : 0,
+      conversionRate: calculatedConversionRate,
+      retentionRate: calculatedRetentionRate,
+      avgLTV: calculatedAvgLTV,
       totalLTV,
       avgConversionTime: clientsWithConversionData > 0 ? totalConversionSpan / clientsWithConversionData : 0
     };
@@ -104,17 +111,17 @@ export const ClientConversionDrillDownModalV3: React.FC<ClientConversionDrillDow
     // For ranking type, focus on the selected metric
     if (type === 'ranking' && data.metric) {
       return (
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           {/* Primary Metric Card - The selected metric */}
-          <Card className="bg-gradient-to-br from-emerald-500 to-emerald-600 text-white border-0 shadow-lg col-span-1 lg:col-span-2">
+          <Card className="bg-gradient-to-br from-emerald-500 to-emerald-600 text-white border-0 shadow-lg">
             <CardContent className="p-6">
               <div className="flex items-center justify-between mb-3">
                 <Trophy className="w-6 h-6 text-emerald-100" />
                 <Badge className="bg-white/20 text-white border-0">Selected Metric</Badge>
               </div>
               <div className="text-3xl font-bold mb-2">
-                {data.metric === 'avgLTV' ? formatCurrency(data.item[data.metric] || 0) : 
-                 data.metric.includes('Rate') || data.metric.includes('Conversion') ? 
+                {data.metric === 'avgLTV' || data.metric === 'revenuePerSession' ? formatCurrency(data.item[data.metric] || 0) : 
+                 data.metric.includes('Rate') || data.metric.includes('Conversion') || data.metric.includes('retention') ? 
                  `${(data.item[data.metric] || 0).toFixed(1)}%` : 
                  formatNumber(data.item[data.metric] || 0)}
               </div>
@@ -125,26 +132,55 @@ export const ClientConversionDrillDownModalV3: React.FC<ClientConversionDrillDow
             </CardContent>
           </Card>
 
-          {/* Supporting Metrics */}
-          <Card className="bg-gradient-to-br from-blue-500 to-blue-600 text-white border-0 shadow-lg">
+          {/* Supporting Metrics - Essential Counts */}
+          <Card className="bg-gradient-to-br from-blue-50 via-white to-blue-50 border-blue-200 shadow-lg">
             <CardContent className="p-4">
-              <div className="flex items-center justify-between mb-2">
-                <Users className="w-5 h-5 text-blue-100" />
-                <Badge className="bg-white/20 text-white border-0">Total</Badge>
+              <div className="mb-4">
+                <h3 className="text-blue-800 font-semibold mb-3 flex items-center gap-2">
+                  <Users className="w-4 h-4" />
+                  Member Counts
+                </h3>
               </div>
-              <div className="text-2xl font-bold">{formatNumber(summary.totalMembers)}</div>
-              <div className="text-blue-100 text-sm">Total Members</div>
+              <div className="space-y-3">
+                <div className="flex justify-between items-center p-3 bg-white rounded-lg border-l-4 border-blue-400">
+                  <span className="text-sm font-medium text-slate-700">Total Members</span>
+                  <span className="text-lg font-bold text-blue-600">{formatNumber(summary.totalMembers)}</span>
+                </div>
+                <div className="flex justify-between items-center p-3 bg-white rounded-lg border-l-4 border-green-400">
+                  <span className="text-sm font-medium text-slate-700">New Members</span>
+                  <span className="text-lg font-bold text-green-600">{formatNumber(summary.newMembers)}</span>
+                </div>
+                <div className="flex justify-between items-center p-3 bg-white rounded-lg border-l-4 border-emerald-400">
+                  <span className="text-sm font-medium text-slate-700">Converted</span>
+                  <span className="text-lg font-bold text-emerald-600">{formatNumber(summary.convertedMembers)}</span>
+                </div>
+              </div>
             </CardContent>
           </Card>
 
-          <Card className="bg-gradient-to-br from-purple-500 to-purple-600 text-white border-0 shadow-lg">
+          {/* Supporting Metrics - Key Rates */}
+          <Card className="bg-gradient-to-br from-purple-50 via-white to-purple-50 border-purple-200 shadow-lg">
             <CardContent className="p-4">
-              <div className="flex items-center justify-between mb-2">
-                <Target className="w-5 h-5 text-purple-100" />
-                <Badge className="bg-white/20 text-white border-0">Rate</Badge>
+              <div className="mb-4">
+                <h3 className="text-purple-800 font-semibold mb-3 flex items-center gap-2">
+                  <Target className="w-4 h-4" />
+                  Performance Rates
+                </h3>
               </div>
-              <div className="text-2xl font-bold">{summary.conversionRate.toFixed(1)}%</div>
-              <div className="text-purple-100 text-sm">Conversion Rate</div>
+              <div className="space-y-3">
+                <div className="flex justify-between items-center p-3 bg-white rounded-lg border-l-4 border-purple-400">
+                  <span className="text-sm font-medium text-slate-700">Conversion Rate</span>
+                  <span className="text-lg font-bold text-purple-600">{summary.conversionRate.toFixed(1)}%</span>
+                </div>
+                <div className="flex justify-between items-center p-3 bg-white rounded-lg border-l-4 border-pink-400">
+                  <span className="text-sm font-medium text-slate-700">Retention Rate</span>
+                  <span className="text-lg font-bold text-pink-600">{summary.retentionRate.toFixed(1)}%</span>
+                </div>
+                <div className="flex justify-between items-center p-3 bg-white rounded-lg border-l-4 border-orange-400">
+                  <span className="text-sm font-medium text-slate-700">Average LTV</span>
+                  <span className="text-lg font-bold text-orange-600">{formatCurrency(summary.avgLTV)}</span>
+                </div>
+              </div>
             </CardContent>
           </Card>
         </div>

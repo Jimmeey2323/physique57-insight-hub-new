@@ -586,8 +586,12 @@ export const ClientConversionSimplifiedRanks: React.FC<ClientConversionSimplifie
   const currentMetric = availableMetrics.find(m => m.id === selectedRanking.split('-')[1]);
 
   const formatValue = (value: number, metric: string) => {
-    if (metric === 'avgLTV') return formatCurrency(value);
-    if (metric === 'totalSessions' || metric === 'classAverage') return value.toFixed(1);
+    if (metric === 'avgLTV' || metric === 'revenuePerSession' || metric.includes('revenue') || metric.includes('Revenue')) {
+      return formatCurrency(value);
+    }
+    if (metric === 'totalSessions' || metric === 'classAverage' || metric === 'totalCustomers') {
+      return value.toFixed(1);
+    }
     return `${value.toFixed(1)}%`;
   };
 
@@ -625,7 +629,7 @@ export const ClientConversionSimplifiedRanks: React.FC<ClientConversionSimplifie
           return `${(value || 0).toFixed(1)}%`;
         case 'avgLTV':
         case 'revenuePerSession':
-          return `$${(value || 0).toFixed(2)}`;
+          return formatCurrency(value || 0);
         case 'efficiencyScore':
           return `${(value || 0).toFixed(0)}/100`;
         case 'classAverage':
@@ -699,30 +703,27 @@ export const ClientConversionSimplifiedRanks: React.FC<ClientConversionSimplifie
                   }`}>
                     {index === 0 && isTop ? '🏆' : index === 1 && isTop ? '🥈' : index === 2 && isTop ? '🥉' : index + 1}
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="font-semibold text-gray-900 line-clamp-2 text-lg">
-                      {item.name}
-                    </div>
-                    <div className="text-sm text-gray-600">
-                      {getSecondaryMetric(item, selectedType)}
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="flex items-center gap-3">
                   <Eye className={`w-5 h-5 ${isTop ? "text-green-600" : "text-red-600"}`} />
                 </div>
-              </div>
-              
-              <div className="flex items-center justify-between">
-                <div className={`text-lg font-bold ${isTop ? "text-green-600" : "text-red-600"}`}>
+                
+                {/* Main Metric Value - Prominent Position */}
+                <div className={`text-xl font-bold ${isTop ? "text-green-600" : "text-red-600"}`}>
                   {(() => {
                     const metrics = getMainMetrics(item, currentMetric?.metric || 'conversionRate');
                     return metrics[0]?.value || 'N/A';
                   })()}
                 </div>
+              </div>
+              
+              <div className="space-y-2">
+                <div className="font-semibold text-gray-900 line-clamp-2 text-lg">
+                  {item.name}
+                </div>
+                <div className="text-sm text-gray-600">
+                  {getSecondaryMetric(item, selectedType)}
+                </div>
                 
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap gap-2 mt-3">
                   <Badge variant="outline" className="text-xs">
                     {item.totalSessions || 0} sessions
                   </Badge>
