@@ -45,6 +45,7 @@ export const ClientConversionSimplifiedRanks: React.FC<ClientConversionSimplifie
 }) => {
   const [selectedRanking, setSelectedRanking] = useState('trainer-conversion');
   const [showMore, setShowMore] = useState(false);
+  const [selectedType, setSelectedType] = useState<'trainer' | 'location'>('trainer');
 
   // Calculate previous period dates for growth comparison
   const getPreviousPeriod = (currentStart: string, currentEnd: string) => {
@@ -495,28 +496,17 @@ export const ClientConversionSimplifiedRanks: React.FC<ClientConversionSimplifie
     }).filter(stat => stat.totalClients > 0);
   }, [data, previousPeriodClientData]);
 
-  // Simplified ranking options - only the most important metrics
-  const allRankingOptions = [
-    // Trainer Rankings
-    { id: 'trainer-conversion', label: 'Trainer Conversion Rate', icon: Trophy, type: 'trainer', metric: 'conversionRate', category: 'conversion' },
-    { id: 'trainer-classes', label: 'Classes Taught', icon: Calendar, type: 'trainer', metric: 'totalSessions', category: 'sessions' },
-    { id: 'trainer-average', label: 'Class Average', icon: BarChart3, type: 'trainer', metric: 'classAverage', category: 'attendance' },
-    { id: 'trainer-empty', label: 'Empty Classes', icon: XCircle, type: 'trainer', metric: 'emptyClassRate', category: 'empty' },
-    
-    // Location Rankings
-    { id: 'location-conversion', label: 'Location Conversion Rate', icon: MapPin, type: 'location', metric: 'conversionRate', category: 'conversion' },
-    { id: 'location-classes', label: 'Total Sessions', icon: Calendar, type: 'location', metric: 'totalSessions', category: 'sessions' },
-    { id: 'location-average', label: 'Class Average', icon: BarChart3, type: 'location', metric: 'classAverage', category: 'attendance' },
-    { id: 'location-empty', label: 'Empty Classes', icon: XCircle, type: 'location', metric: 'emptyClassRate', category: 'empty' },
-    
-    // Membership Rankings
-    { id: 'membership-conversion', label: 'Membership Conversion', icon: Target, type: 'membership', metric: 'conversionRate', category: 'conversion' },
-    { id: 'membership-ltv', label: 'Membership LTV', icon: DollarSign, type: 'membership', metric: 'avgLTV', category: 'revenue' }
+  // Simplified ranking options based on metric types
+  const metricOptions = [
+    { id: 'conversion', label: 'Conversion Rate', icon: Trophy, metric: 'conversionRate', category: 'conversion' },
+    { id: 'sessions', label: 'Total Sessions', icon: Calendar, metric: 'totalSessions', category: 'sessions' },
+    { id: 'average', label: 'Class Average', icon: BarChart3, metric: 'classAverage', category: 'attendance' },
+    { id: 'empty', label: 'Empty Classes', icon: XCircle, metric: 'emptyClassRate', category: 'empty' },
   ];
 
-  // Filter ranking options based on selectedMetric
-  const rankingOptions = React.useMemo(() => {
-    if (!selectedMetric) return allRankingOptions;
+  // Filter metric options based on selectedMetric prop
+  const availableMetrics = React.useMemo(() => {
+    if (!selectedMetric) return metricOptions;
     
     // Map selectedMetric to categories that should be shown
     const metricToCategories: Record<string, string[]> = {
@@ -528,58 +518,61 @@ export const ClientConversionSimplifiedRanks: React.FC<ClientConversionSimplifie
       'ltv': ['revenue']
     };
     
-    const allowedCategories = metricToCategories[selectedMetric] || ['conversion']; // default to conversion
-    return allRankingOptions.filter(option => allowedCategories.includes(option.category));
+    const allowedCategories = metricToCategories[selectedMetric] || ['conversion'];
+    return metricOptions.filter(option => allowedCategories.includes(option.category));
   }, [selectedMetric]);
 
-  // Auto-select first available ranking when metric filter changes
+  // Get current ranking key based on type and metric
+  const getCurrentRankingKey = (type: string, metricId: string) => {
+    return `${type}-${metricId}`;
+  };
+
+  // Auto-select first available ranking when type or metric changes
   React.useEffect(() => {
-    if (rankingOptions.length > 0 && !rankingOptions.find(r => r.id === selectedRanking)) {
-      setSelectedRanking(rankingOptions[0].id);
+    if (availableMetrics.length > 0) {
+      const firstMetric = availableMetrics[0];
+      const newRankingKey = getCurrentRankingKey(selectedType, firstMetric.id);
+      setSelectedRanking(newRankingKey);
     }
-  }, [rankingOptions, selectedRanking]);
+  }, [selectedType, availableMetrics]);
 
   const getCurrentData = () => {
-    const option = rankingOptions.find(r => r.id === selectedRanking);
-    if (!option) return { top: [], bottom: [], allData: [] };
+    // Get current metric from selectedRanking
+    const metricId = selectedRanking.split('-')[1];
+    const currentMetric = availableMetrics.find(m => m.id === metricId);
+    if (!currentMetric) return { top: [], bottom: [], allData: [], hasMore: false };
 
     let sourceData;
-    switch (option.type) {
+    switch (selectedType) {
       case 'trainer':
         sourceData = trainerStats;
         break;
       case 'location':
         sourceData = locationStats;
         break;
-      case 'membership':
-        sourceData = membershipStats;
-        break;
       default:
         sourceData = trainerStats;
     }
 
     // Filter out entries with insufficient data
-    const minThreshold = option.type === 'membership' ? 5 : 3;
+    const minThreshold = 3;
     const filtered = sourceData.filter(item => {
-      if (option.type === 'membership') {
-        return item.totalClients >= minThreshold;
-      }
       return (item.totalSessions || 0) >= minThreshold;
     });
     
     const sorted = [...filtered].sort((a, b) => {
       // For empty class rate, we want ascending order (lower is better)
-      if (option.metric === 'emptyClassRate') {
-        return a[option.metric] - b[option.metric];
+      if (currentMetric.metric === 'emptyClassRate') {
+        return a[currentMetric.metric] - b[currentMetric.metric];
       }
-      return b[option.metric] - a[option.metric];
+      return b[currentMetric.metric] - a[currentMetric.metric];
     });
     
     const displayCount = showMore ? Math.max(10, sorted.length) : 5;
     
     return {
       top: sorted.slice(0, displayCount),
-      bottom: option.metric === 'emptyClassRate' ? 
+      bottom: currentMetric.metric === 'emptyClassRate' ? 
         sorted.slice(-displayCount).reverse() : 
         sorted.slice(-displayCount).reverse(),
       allData: sorted,
@@ -588,7 +581,7 @@ export const ClientConversionSimplifiedRanks: React.FC<ClientConversionSimplifie
   };
 
   const { top, bottom, allData, hasMore } = getCurrentData();
-  const currentOption = rankingOptions.find(r => r.id === selectedRanking);
+  const currentMetric = availableMetrics.find(m => m.id === selectedRanking.split('-')[1]);
 
   const formatValue = (value: number, metric: string) => {
     if (metric === 'avgLTV') return formatCurrency(value);
@@ -597,10 +590,10 @@ export const ClientConversionSimplifiedRanks: React.FC<ClientConversionSimplifie
   };
 
   const getSecondaryMetric = (item: any, type: string) => {
-    const currentMetric = currentOption?.metric;
+    const currentMetricValue = currentMetric?.metric;
     
     // For conversion rate rankings, show new members and converted members
-    if (currentMetric === 'conversionRate') {
+    if (currentMetricValue === 'conversionRate') {
       return `${item.totalNew || 0} new • ${item.totalConverted || 0} converted`;
     }
     
@@ -622,67 +615,87 @@ export const ClientConversionSimplifiedRanks: React.FC<ClientConversionSimplifie
     
     // For other metrics, return single metric
     return [
-      { label: currentOption?.label || '', value: formatValue(item[metric] || 0, metric), color: 'emerald' }
+      { label: currentMetric?.label || '', value: formatValue(item[metric] || 0, metric), color: 'emerald' }
     ];
   };
 
   const RankCard = ({ title, data: rankData, isTop = true }) => (
-    <Card className="group relative overflow-hidden bg-white shadow-xl border-0 hover:shadow-2xl transition-all duration-500 hover:scale-[1.02] hover:-translate-y-1 transform-gpu">
-      {/* Animated background pattern */}
+    <Card className="group relative overflow-hidden bg-white shadow-xl border-0 hover:shadow-2xl transition-all duration-500 hover:scale-[1.02] hover:-translate-y-2 transform-gpu">
+      {/* Enhanced background pattern */}
       <div className="absolute inset-0 bg-gradient-to-br from-white via-slate-50/30 to-white opacity-50" />
+      <div className="absolute inset-0 bg-gradient-to-br from-transparent via-transparent to-slate-100/20" />
       
       <CardHeader className={`relative bg-gradient-to-r ${
         isTop 
           ? 'from-emerald-500 via-emerald-600 to-teal-600' 
           : 'from-orange-500 via-orange-600 to-red-600'
-      } text-white border-0 shadow-lg`}>
-        <div className="absolute top-0 right-0 w-24 h-24 transform translate-x-10 -translate-y-10 opacity-20 group-hover:opacity-30 transition-opacity duration-500">
-          {isTop ? <Crown className="w-24 h-24" /> : <AlertTriangle className="w-24 h-24" />}
+      } text-white border-0 shadow-lg overflow-hidden`}>
+        {/* Enhanced animated background pattern */}
+        <div className="absolute top-0 right-0 w-32 h-32 transform translate-x-12 -translate-y-12 opacity-20 group-hover:opacity-30 transition-all duration-500 group-hover:scale-110">
+          {isTop ? <Crown className="w-32 h-32" /> : <AlertTriangle className="w-32 h-32" />}
         </div>
+        <div className="absolute bottom-0 left-0 w-24 h-24 transform -translate-x-8 translate-y-8 opacity-10 group-hover:opacity-20 transition-all duration-700">
+          <Trophy className="w-24 h-24" />
+        </div>
+        
         <CardTitle className="flex items-center gap-3 relative z-10">
-          <div className="p-2 bg-white/20 rounded-xl backdrop-blur-sm group-hover:scale-110 transition-transform duration-300">
+          <div className="p-3 bg-white/20 rounded-xl backdrop-blur-sm group-hover:scale-110 transition-transform duration-300 group-hover:bg-white/30">
             {isTop ? <Crown className="w-6 h-6" /> : <AlertTriangle className="w-6 h-6" />}
           </div>
           <div>
-            <h3 className="text-lg font-bold">{title}</h3>
+            <h3 className="text-xl font-bold">{title}</h3>
             <p className="text-sm opacity-90 font-medium">
-              {isTop ? 'Top performers' : 'Needs attention'}
+              {isTop ? '🏆 Top performers' : '⚠️ Needs attention'}
             </p>
+          </div>
+          <div className="ml-auto">
+            <Badge className={`${
+              isTop ? 'bg-white/20 hover:bg-white/30' : 'bg-white/20 hover:bg-white/30'
+            } text-white border-0 px-3 py-1`}>
+              {rankData.length} {selectedType}s
+            </Badge>
           </div>
         </CardTitle>
       </CardHeader>
+      
       <CardContent className="relative p-6 space-y-4 bg-gradient-to-br from-white to-slate-50/30">
         {rankData.map((item, index) => (
           <div 
             key={item.name} 
-            className="group/item flex items-center justify-between p-4 bg-gradient-to-r from-white via-slate-50/50 to-white rounded-xl border border-slate-100 hover:border-slate-200 hover:shadow-lg transition-all duration-300 cursor-pointer hover:scale-[1.02] transform-gpu"
-            onClick={() => onDrillDown?.(currentOption?.type || 'trainer', item, currentOption?.metric || 'conversionRate')}
+            className="group/item flex items-center justify-between p-5 bg-gradient-to-r from-white via-slate-50/50 to-white rounded-xl border border-slate-100 hover:border-slate-200 hover:shadow-xl transition-all duration-300 cursor-pointer hover:scale-[1.02] transform-gpu relative overflow-hidden"
+            onClick={() => onDrillDown?.(selectedType, item, currentMetric?.metric || 'conversionRate')}
           >
-            <div className="flex items-center gap-4">
-              <div className={`flex items-center justify-center w-11 h-11 rounded-full font-bold text-sm transition-all duration-300 shadow-md group-hover/item:scale-110 transform-gpu ${
-                index === 0 && isTop ? 'bg-gradient-to-br from-yellow-400 via-yellow-500 to-yellow-600 text-white shadow-yellow-300/30' :
-                index === 1 && isTop ? 'bg-gradient-to-br from-gray-300 via-gray-400 to-gray-500 text-white shadow-gray-300/30' :
-                index === 2 && isTop ? 'bg-gradient-to-br from-orange-400 via-orange-500 to-orange-600 text-white shadow-orange-300/30' :
-                'bg-gradient-to-br from-slate-200 via-slate-250 to-slate-300 text-slate-700 shadow-slate-200/30'
+            {/* Item background decoration */}
+            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-slate-50/30 to-transparent opacity-0 group-hover/item:opacity-100 transition-opacity duration-300" />
+            
+            <div className="flex items-center gap-4 relative z-10">
+              <div className={`flex items-center justify-center w-12 h-12 rounded-xl font-bold text-sm transition-all duration-300 shadow-lg group-hover/item:scale-110 transform-gpu ${
+                index === 0 && isTop
+                  ? 'bg-gradient-to-r from-yellow-400 to-yellow-500 text-yellow-900 shadow-yellow-200'
+                  : index === 1 && isTop
+                  ? 'bg-gradient-to-r from-gray-300 to-gray-400 text-gray-800 shadow-gray-200'
+                  : index === 2 && isTop
+                  ? 'bg-gradient-to-r from-orange-400 to-orange-500 text-orange-900 shadow-orange-200'
+                  : isTop
+                  ? 'bg-gradient-to-r from-emerald-100 to-emerald-200 text-emerald-800 shadow-emerald-100'
+                  : 'bg-gradient-to-r from-red-100 to-red-200 text-red-800 shadow-red-100'
               }`}>
-                {index === 0 && isTop ? '👑' : 
-                 index === 1 && isTop ? '🥈' : 
-                 index === 2 && isTop ? '🥉' : 
-                 `#${index + 1}`}
+                {index === 0 && isTop ? '🏆' : index === 1 && isTop ? '🥈' : index === 2 && isTop ? '🥉' : index + 1}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="font-bold text-slate-900 truncate max-w-[200px] group-hover/item:text-slate-800 transition-colors" title={item.name}>
+                <p className="font-bold text-slate-900 truncate max-w-[200px] group-hover/item:text-slate-800 transition-colors text-lg" title={item.name}>
                   {item.name}
                 </p>
                 <p className="text-sm text-slate-500 group-hover/item:text-slate-600 transition-colors">
-                  {getSecondaryMetric(item, currentOption?.type || 'trainer')}
+                  {getSecondaryMetric(item, selectedType)}
                 </p>
               </div>
             </div>
-            <div className="text-right flex items-center gap-3">
+            
+            <div className="text-right flex items-center gap-3 relative z-10">
               {/* Multiple metrics display for conversion rankings */}
               {(() => {
-                const metrics = getMainMetrics(item, currentOption?.metric || 'conversionRate');
+                const metrics = getMainMetrics(item, currentMetric?.metric || 'conversionRate');
                 
                 if (metrics.length > 1) {
                   // Modern layout for conversion metrics (similar to sales tab)
@@ -731,7 +744,7 @@ export const ClientConversionSimplifiedRanks: React.FC<ClientConversionSimplifie
                   <div>
                     <div className="flex items-center gap-2">
                       <Badge 
-                        className={`font-bold text-sm px-3 py-1 ${
+                        className={`font-bold text-lg px-4 py-2 ${
                           isTop 
                             ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' 
                             : 'bg-orange-100 text-orange-800 border border-orange-200'
@@ -742,13 +755,13 @@ export const ClientConversionSimplifiedRanks: React.FC<ClientConversionSimplifie
                       {/* Growth Indicator */}
                       {(() => {
                         const getGrowthMetric = () => {
-                          if (currentOption?.metric === 'conversionRate') return item.conversionGrowth;
-                          if (currentOption?.metric === 'classAverage') return item.classAverageGrowth;
-                          if (currentOption?.metric === 'totalSessions') return item.sessionsGrowth;
-                          if (currentOption?.metric === 'emptyClassRate') return item.emptyClassRateGrowth;
-                          if (currentOption?.metric === 'totalCustomers') return item.customersGrowth;
-                          if (currentOption?.metric === 'totalClients') return item.clientsGrowth;
-                          if (currentOption?.metric === 'avgLTV') return item.ltvGrowth;
+                          if (currentMetric?.metric === 'conversionRate') return item.conversionGrowth;
+                          if (currentMetric?.metric === 'classAverage') return item.classAverageGrowth;
+                          if (currentMetric?.metric === 'totalSessions') return item.sessionsGrowth;
+                          if (currentMetric?.metric === 'emptyClassRate') return item.emptyClassRateGrowth;
+                          if (currentMetric?.metric === 'totalCustomers') return item.customersGrowth;
+                          if (currentMetric?.metric === 'totalClients') return item.clientsGrowth;
+                          if (currentMetric?.metric === 'avgLTV') return item.ltvGrowth;
                           return 0;
                         };
                         
@@ -773,13 +786,13 @@ export const ClientConversionSimplifiedRanks: React.FC<ClientConversionSimplifie
               })()}
               
               {/* Additional details for trainers/locations */}
-              {(currentOption?.type === 'trainer' || currentOption?.type === 'location') && (
+              {(selectedType === 'trainer' || selectedType === 'location') && (
                 <p className="text-xs text-slate-500 mt-1">
                   {item.classAverage?.toFixed(1)} avg
                 </p>
               )}
             </div>
-            <Eye className="w-4 h-4 text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+            <Eye className="w-5 h-5 text-slate-400 opacity-0 group-hover/item:opacity-100 transition-opacity ml-3 relative z-10" />
           </div>
         ))}
         
@@ -815,40 +828,77 @@ export const ClientConversionSimplifiedRanks: React.FC<ClientConversionSimplifie
 
   return (
     <div className="space-y-6">
-      {/* Ranking Selection Buttons */}
+      {/* Header with Type Toggle */}
       <Card className="bg-white shadow-lg border-0">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-3 text-slate-800">
-            <Trophy className="w-6 h-6 text-yellow-600" />
-            Performance Rankings
-            <span className="text-sm font-normal text-slate-500 ml-2">
-              Based on filtered data ({data.length} clients, {filteredPayrollData.length} payroll records)
-            </span>
-          </CardTitle>
-          {selectedLocation !== 'All Locations' && (
-            <div className="flex items-center gap-2 text-sm text-blue-600 bg-blue-50 px-3 py-1 rounded-lg">
-              <MapPin className="w-4 h-4" />
-              Filtered by: {selectedLocation}
-            </div>
-          )}
+        <CardHeader className="border-b border-gray-100 bg-gradient-to-r from-blue-600 to-purple-600 text-white">
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2">
+              <Trophy className="w-5 h-5" />
+              Performance Rankings
+              <Badge variant="secondary" className="bg-white/20 text-white">
+                Based on filtered data ({data.length} clients, {filteredPayrollData.length} payroll records)
+              </Badge>
+            </CardTitle>
+            {selectedLocation !== 'All Locations' && (
+              <div className="flex items-center gap-2 text-sm text-blue-100 bg-blue-800/30 px-3 py-1 rounded-lg">
+                <MapPin className="w-4 h-4" />
+                Filtered by: {selectedLocation}
+              </div>
+            )}
+          </div>
         </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
-            {rankingOptions.map((option) => (
+        <CardContent className="p-6">
+          {/* Type Toggle */}
+          <div className="flex items-center justify-center mb-6">
+            <div className="bg-slate-100 p-1 rounded-xl">
+              <div className="flex gap-1">
+                <Button
+                  variant={selectedType === 'trainer' ? 'default' : 'ghost'}
+                  size="sm"
+                  onClick={() => setSelectedType('trainer')}
+                  className={`px-6 py-2 rounded-lg transition-all duration-300 ${
+                    selectedType === 'trainer'
+                      ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white shadow-lg'
+                      : 'hover:bg-white'
+                  }`}
+                >
+                  <Users className="w-4 h-4 mr-2" />
+                  Trainer Rankings
+                </Button>
+                <Button
+                  variant={selectedType === 'location' ? 'default' : 'ghost'}
+                  size="sm"
+                  onClick={() => setSelectedType('location')}
+                  className={`px-6 py-2 rounded-lg transition-all duration-300 ${
+                    selectedType === 'location'
+                      ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white shadow-lg'
+                      : 'hover:bg-white'
+                  }`}
+                >
+                  <MapPin className="w-4 h-4 mr-2" />
+                  Location Rankings
+                </Button>
+              </div>
+            </div>
+          </div>
+
+          {/* Metric Tabs */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            {availableMetrics.map((metric) => (
               <Button
-                key={option.id}
-                variant={selectedRanking === option.id ? 'default' : 'ghost'}
+                key={metric.id}
+                variant={selectedRanking === getCurrentRankingKey(selectedType, metric.id) ? 'default' : 'ghost'}
                 size="sm"
-                onClick={() => setSelectedRanking(option.id)}
-                className={`flex flex-col items-center gap-2 h-auto py-3 px-2 transition-all duration-300 hover:scale-105 ${
-                  selectedRanking === option.id 
-                    ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white shadow-lg' 
-                    : 'hover:bg-slate-100'
+                onClick={() => setSelectedRanking(getCurrentRankingKey(selectedType, metric.id))}
+                className={`flex flex-col items-center gap-2 h-auto py-4 px-3 transition-all duration-300 hover:scale-105 ${
+                  selectedRanking === getCurrentRankingKey(selectedType, metric.id)
+                    ? 'bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-lg'
+                    : 'hover:bg-slate-100 hover:shadow-md'
                 }`}
               >
-                <option.icon className="w-4 h-4" />
+                <metric.icon className="w-5 h-5" />
                 <span className="text-xs font-medium text-center leading-tight">
-                  {option.label}
+                  {metric.label}
                 </span>
               </Button>
             ))}
@@ -862,8 +912,7 @@ export const ClientConversionSimplifiedRanks: React.FC<ClientConversionSimplifie
           <CardContent className="p-4 text-center">
             <div className="text-2xl font-bold text-blue-700">{allData?.length || 0}</div>
             <div className="text-sm text-blue-600">
-              {currentOption?.type === 'membership' ? 'Memberships' : 
-               currentOption?.type === 'location' ? 'Locations' : 'Trainers'} with sufficient data
+              {selectedType === 'location' ? 'Locations' : 'Trainers'} with sufficient data
             </div>
           </CardContent>
         </Card>
@@ -883,23 +932,27 @@ export const ClientConversionSimplifiedRanks: React.FC<ClientConversionSimplifie
         </Card>
       </div>
 
-      {/* Top and Bottom Rankings */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {/* Enhanced Ranking Cards */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         <RankCard
-          title={`Best ${currentOption?.label || 'Performance'}`}
+          title={`Best ${currentMetric?.label || 'Performance'}`}
           data={top}
           isTop={true}
         />
         
         <RankCard
-          title={`${currentOption?.metric === 'emptyClassRate' ? 'Most' : 'Lowest'} ${currentOption?.label || 'Performance'}`}
+          title={`${currentMetric?.metric === 'emptyClassRate' ? 'Most' : 'Lowest'} ${currentMetric?.label || 'Performance'}`}
           data={bottom}
           isTop={false}
         />
       </div>
       
       {/* Click to drill down instruction */}
-      <div className="text-center text-sm text-slate-500 bg-slate-50 p-3 rounded-lg">
+      <div className="text-center text-sm text-slate-500 bg-gradient-to-r from-slate-50 to-slate-100 p-4 rounded-xl border border-slate-200">
+        <div className="flex items-center justify-center gap-2 mb-2">
+          <Eye className="w-4 h-4" />
+          <span className="font-medium">Interactive Analytics</span>
+        </div>
         💡 Click on any ranking item to view detailed analytics and drill-down insights
       </div>
     </div>
