@@ -29,6 +29,7 @@ interface ClientConversionSimplifiedRanksProps {
   allClientData: NewClientData[];
   selectedLocation: string;
   dateRange: { start: string; end: string };
+  selectedMetric?: string; // New prop to control which metric to display
   onDrillDown?: (type: string, item: any, metric: string) => void;
 }
 
@@ -39,6 +40,7 @@ export const ClientConversionSimplifiedRanks: React.FC<ClientConversionSimplifie
   allClientData,
   selectedLocation, 
   dateRange,
+  selectedMetric,
   onDrillDown 
 }) => {
   const [selectedRanking, setSelectedRanking] = useState('trainer-conversion');
@@ -494,23 +496,48 @@ export const ClientConversionSimplifiedRanks: React.FC<ClientConversionSimplifie
   }, [data, previousPeriodClientData]);
 
   // Simplified ranking options - only the most important metrics
-  const rankingOptions = [
+  const allRankingOptions = [
     // Trainer Rankings
-    { id: 'trainer-conversion', label: 'Trainer Conversion Rate', icon: Trophy, type: 'trainer', metric: 'conversionRate' },
-    { id: 'trainer-classes', label: 'Classes Taught', icon: Calendar, type: 'trainer', metric: 'totalSessions' },
-    { id: 'trainer-average', label: 'Class Average', icon: BarChart3, type: 'trainer', metric: 'classAverage' },
-    { id: 'trainer-empty', label: 'Empty Classes', icon: XCircle, type: 'trainer', metric: 'emptyClassRate' },
+    { id: 'trainer-conversion', label: 'Trainer Conversion Rate', icon: Trophy, type: 'trainer', metric: 'conversionRate', category: 'conversion' },
+    { id: 'trainer-classes', label: 'Classes Taught', icon: Calendar, type: 'trainer', metric: 'totalSessions', category: 'sessions' },
+    { id: 'trainer-average', label: 'Class Average', icon: BarChart3, type: 'trainer', metric: 'classAverage', category: 'attendance' },
+    { id: 'trainer-empty', label: 'Empty Classes', icon: XCircle, type: 'trainer', metric: 'emptyClassRate', category: 'empty' },
     
     // Location Rankings
-    { id: 'location-conversion', label: 'Location Conversion Rate', icon: MapPin, type: 'location', metric: 'conversionRate' },
-    { id: 'location-classes', label: 'Total Sessions', icon: Calendar, type: 'location', metric: 'totalSessions' },
-    { id: 'location-average', label: 'Class Average', icon: BarChart3, type: 'location', metric: 'classAverage' },
-    { id: 'location-empty', label: 'Empty Classes', icon: XCircle, type: 'location', metric: 'emptyClassRate' },
+    { id: 'location-conversion', label: 'Location Conversion Rate', icon: MapPin, type: 'location', metric: 'conversionRate', category: 'conversion' },
+    { id: 'location-classes', label: 'Total Sessions', icon: Calendar, type: 'location', metric: 'totalSessions', category: 'sessions' },
+    { id: 'location-average', label: 'Class Average', icon: BarChart3, type: 'location', metric: 'classAverage', category: 'attendance' },
+    { id: 'location-empty', label: 'Empty Classes', icon: XCircle, type: 'location', metric: 'emptyClassRate', category: 'empty' },
     
     // Membership Rankings
-    { id: 'membership-conversion', label: 'Membership Conversion', icon: Target, type: 'membership', metric: 'conversionRate' },
-    { id: 'membership-ltv', label: 'Membership LTV', icon: DollarSign, type: 'membership', metric: 'avgLTV' }
+    { id: 'membership-conversion', label: 'Membership Conversion', icon: Target, type: 'membership', metric: 'conversionRate', category: 'conversion' },
+    { id: 'membership-ltv', label: 'Membership LTV', icon: DollarSign, type: 'membership', metric: 'avgLTV', category: 'revenue' }
   ];
+
+  // Filter ranking options based on selectedMetric
+  const rankingOptions = React.useMemo(() => {
+    if (!selectedMetric) return allRankingOptions;
+    
+    // Map selectedMetric to categories that should be shown
+    const metricToCategories: Record<string, string[]> = {
+      'conversion': ['conversion'],
+      'empty': ['empty'],
+      'sessions': ['sessions'],
+      'attendance': ['attendance'],
+      'revenue': ['revenue'],
+      'ltv': ['revenue']
+    };
+    
+    const allowedCategories = metricToCategories[selectedMetric] || ['conversion']; // default to conversion
+    return allRankingOptions.filter(option => allowedCategories.includes(option.category));
+  }, [selectedMetric]);
+
+  // Auto-select first available ranking when metric filter changes
+  React.useEffect(() => {
+    if (rankingOptions.length > 0 && !rankingOptions.find(r => r.id === selectedRanking)) {
+      setSelectedRanking(rankingOptions[0].id);
+    }
+  }, [rankingOptions, selectedRanking]);
 
   const getCurrentData = () => {
     const option = rankingOptions.find(r => r.id === selectedRanking);

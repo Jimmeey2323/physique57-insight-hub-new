@@ -27,6 +27,7 @@ import { ClientConversionYearOnYearTable } from '@/components/dashboard/ClientCo
 import { ClientConversionMembershipTable } from '@/components/dashboard/ClientConversionMembershipTable';
 import { ClientHostedClassesTable } from '@/components/dashboard/ClientHostedClassesTable';
 import { ClientConversionDrillDownModalV3 } from '@/components/dashboard/ClientConversionDrillDownModalV3';
+import { ClientRetentionMetricSelector } from '@/components/dashboard/ClientRetentionMetricSelector';
 const ClientRetention = () => {
   const {
     data,
@@ -47,6 +48,7 @@ const ClientRetention = () => {
   const navigate = useNavigate();
   const [selectedLocation, setSelectedLocation] = useState('All Locations');
   const [activeTable, setActiveTable] = useState('monthonmonthbytype');
+  const [selectedMetric, setSelectedMetric] = useState('conversion'); // New state for metric selection
   const [drillDownModal, setDrillDownModal] = useState({
     isOpen: false,
     client: null,
@@ -499,6 +501,14 @@ const ClientRetention = () => {
             })} />
           </div>
 
+          {/* Metric Selector for Rankings */}
+          <div className="glass-card modern-card-hover rounded-2xl p-6 slide-in-right stagger-2">
+            <ClientRetentionMetricSelector 
+              selectedMetric={selectedMetric}
+              onMetricChange={setSelectedMetric}
+            />
+          </div>
+
           {/* Enhanced Simplified Ranking System */}
           <div className="glass-card modern-card-hover rounded-2xl p-6 slide-in-right stagger-3">
             <ClientConversionSimplifiedRanks 
@@ -508,6 +518,7 @@ const ClientRetention = () => {
               allClientData={data}
               selectedLocation={selectedLocation}
               dateRange={filters.dateRange}
+              selectedMetric={selectedMetric}
               onDrillDown={(type, item, metric) => setDrillDownModal({
                 isOpen: true,
                 client: null,
