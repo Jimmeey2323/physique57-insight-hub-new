@@ -11,156 +11,136 @@ import {
   Target, 
   Crown, 
   AlertTriangle,
-  Star,
-  Award,
-  TrendingUp,
+  BarChart3,
+  XCircle,
   Calendar
 } from 'lucide-react';
 import { formatCurrency, formatNumber } from '@/utils/formatters';
-import { NewClientData } from '@/types/dashboard';
+import { NewClientData, PayrollData } from '@/types/dashboard';
+import { usePayrollData } from '@/hooks/usePayrollData';
 
 interface ClientConversionSimplifiedRanksProps {
   data: NewClientData[];
 }
 
 export const ClientConversionSimplifiedRanks: React.FC<ClientConversionSimplifiedRanksProps> = ({ data }) => {
+  const { data: payrollData, isLoading: payrollLoading } = usePayrollData();
   const [selectedRanking, setSelectedRanking] = useState('trainer-conversion');
 
-  // Calculate stats
+  // Calculate trainer stats using both New Client data and Payroll data
   const trainerStats = React.useMemo(() => {
+    if (!payrollData || payrollData.length === 0) return [];
+    
     const stats = new Map();
     
-    data.forEach(client => {
-      const trainer = client.trainerName || 'Unknown';
+    // First, get base stats from payroll data (class data)
+    payrollData.forEach(payroll => {
+      const trainer = payroll.teacherName;
+      if (!trainer || trainer === 'Unknown') return;
+      
       if (!stats.has(trainer)) {
         stats.set(trainer, {
           name: trainer,
-          totalClients: 0,
-          newMembers: 0,
-          converted: 0,
-          retained: 0,
+          location: payroll.location,
+          totalSessions: 0,
+          totalEmptySessions: 0,
+          totalNonEmptySessions: 0,
+          totalCustomers: 0,
+          totalConverted: 0,
+          totalRetained: 0,
+          totalNew: 0,
           totalLTV: 0,
-          trialsCompleted: 0
+          clientCount: 0
         });
       }
       
       const trainerStat = stats.get(trainer);
-      trainerStat.totalClients++;
-      trainerStat.totalLTV += client.ltv || 0;
+      trainerStat.totalSessions += payroll.totalSessions || 0;
+      trainerStat.totalEmptySessions += payroll.totalEmptySessions || 0;
+      trainerStat.totalNonEmptySessions += payroll.totalNonEmptySessions || 0;
+      trainerStat.totalCustomers += payroll.totalCustomers || 0;
+      trainerStat.totalConverted += payroll.converted || 0;
+      trainerStat.totalRetained += payroll.retained || 0;
+      trainerStat.totalNew += payroll.new || 0;
+    });
+    
+    // Then, add client data for LTV calculations
+    data.forEach(client => {
+      const trainer = client.trainerName;
+      if (!trainer || trainer === 'Unknown' || !stats.has(trainer)) return;
       
-      if (String(client.isNew || '').includes('New')) {
-        trainerStat.newMembers++;
-      }
-      if (client.conversionStatus === 'Converted') {
-        trainerStat.converted++;
-      }
-      if (client.retentionStatus === 'Retained') {
-        trainerStat.retained++;
-      }
-      if ((client.visitsPostTrial || 0) > 0) {
-        trainerStat.trialsCompleted++;
-      }
+      const trainerStat = stats.get(trainer);
+      trainerStat.totalLTV += client.ltv || 0;
+      trainerStat.clientCount++;
     });
     
     return Array.from(stats.values()).map(stat => ({
       ...stat,
-      conversionRate: stat.newMembers > 0 ? (stat.converted / stat.newMembers) * 100 : 0,
-      retentionRate: stat.converted > 0 ? (stat.retained / stat.converted) * 100 : 0,
-      avgLTV: stat.totalClients > 0 ? stat.totalLTV / stat.totalClients : 0,
-      trialConversionRate: stat.trialsCompleted > 0 ? (stat.converted / stat.trialsCompleted) * 100 : 0
-    }));
-  }, [data]);
+      conversionRate: stat.totalNew > 0 ? (stat.totalConverted / stat.totalNew) * 100 : 0,
+      retentionRate: stat.totalConverted > 0 ? (stat.totalRetained / stat.totalConverted) * 100 : 0,
+      classAverage: stat.totalNonEmptySessions > 0 ? stat.totalCustomers / stat.totalNonEmptySessions : 0,
+      avgLTV: stat.clientCount > 0 ? stat.totalLTV / stat.clientCount : 0,
+      emptyClassRate: stat.totalSessions > 0 ? (stat.totalEmptySessions / stat.totalSessions) * 100 : 0
+    })).filter(stat => stat.totalSessions > 0); // Only include trainers with sessions
+  }, [data, payrollData]);
 
+  // Calculate location stats using both datasets
   const locationStats = React.useMemo(() => {
+    if (!payrollData || payrollData.length === 0) return [];
+    
     const stats = new Map();
     
-    data.forEach(client => {
-      const location = client.firstVisitLocation || client.homeLocation || 'Unknown';
+    // Get base stats from payroll data
+    payrollData.forEach(payroll => {
+      const location = payroll.location;
+      if (!location) return;
+      
       if (!stats.has(location)) {
         stats.set(location, {
           name: location,
-          totalClients: 0,
-          newMembers: 0,
-          converted: 0,
-          retained: 0,
+          totalSessions: 0,
+          totalEmptySessions: 0,
+          totalNonEmptySessions: 0,
+          totalCustomers: 0,
+          totalConverted: 0,
+          totalRetained: 0,
+          totalNew: 0,
           totalLTV: 0,
-          trialsCompleted: 0
+          clientCount: 0
         });
       }
       
       const locationStat = stats.get(location);
-      locationStat.totalClients++;
-      locationStat.totalLTV += client.ltv || 0;
-      
-      if (String(client.isNew || '').includes('New')) {
-        locationStat.newMembers++;
-      }
-      if (client.conversionStatus === 'Converted') {
-        locationStat.converted++;
-      }
-      if (client.retentionStatus === 'Retained') {
-        locationStat.retained++;
-      }
-      if ((client.visitsPostTrial || 0) > 0) {
-        locationStat.trialsCompleted++;
-      }
+      locationStat.totalSessions += payroll.totalSessions || 0;
+      locationStat.totalEmptySessions += payroll.totalEmptySessions || 0;
+      locationStat.totalNonEmptySessions += payroll.totalNonEmptySessions || 0;
+      locationStat.totalCustomers += payroll.totalCustomers || 0;
+      locationStat.totalConverted += payroll.converted || 0;
+      locationStat.totalRetained += payroll.retained || 0;
+      locationStat.totalNew += payroll.new || 0;
     });
     
-    return Array.from(stats.values()).map(stat => ({
-      ...stat,
-      conversionRate: stat.newMembers > 0 ? (stat.converted / stat.newMembers) * 100 : 0,
-      retentionRate: stat.converted > 0 ? (stat.retained / stat.converted) * 100 : 0,
-      avgLTV: stat.totalClients > 0 ? stat.totalLTV / stat.totalClients : 0,
-      trialConversionRate: stat.trialsCompleted > 0 ? (stat.converted / stat.trialsCompleted) * 100 : 0
-    }));
-  }, [data]);
-
-  // Calculate class stats
-  const classStats = React.useMemo(() => {
-    const stats = new Map();
-    
+    // Add client data for LTV calculations
     data.forEach(client => {
-      const className = client.firstVisitEntityName || 'Unknown Class';
-      if (!stats.has(className)) {
-        stats.set(className, {
-          name: className,
-          totalClients: 0,
-          newMembers: 0,
-          converted: 0,
-          retained: 0,
-          totalLTV: 0,
-          trialsCompleted: 0
-        });
-      }
+      const location = client.firstVisitLocation || client.homeLocation;
+      if (!location || !stats.has(location)) return;
       
-      const classStat = stats.get(className);
-      classStat.totalClients++;
-      classStat.totalLTV += client.ltv || 0;
-      
-      if (String(client.isNew || '').includes('New')) {
-        classStat.newMembers++;
-      }
-      if (client.conversionStatus === 'Converted') {
-        classStat.converted++;
-      }
-      if (client.retentionStatus === 'Retained') {
-        classStat.retained++;
-      }
-      if ((client.visitsPostTrial || 0) > 0) {
-        classStat.trialsCompleted++;
-      }
+      const locationStat = stats.get(location);
+      locationStat.totalLTV += client.ltv || 0;
+      locationStat.clientCount++;
     });
     
     return Array.from(stats.values()).map(stat => ({
       ...stat,
-      conversionRate: stat.newMembers > 0 ? (stat.converted / stat.newMembers) * 100 : 0,
-      retentionRate: stat.converted > 0 ? (stat.retained / stat.converted) * 100 : 0,
-      avgLTV: stat.totalClients > 0 ? stat.totalLTV / stat.totalClients : 0,
-      trialConversionRate: stat.trialsCompleted > 0 ? (stat.converted / stat.trialsCompleted) * 100 : 0
-    }));
-  }, [data]);
+      conversionRate: stat.totalNew > 0 ? (stat.totalConverted / stat.totalNew) * 100 : 0,
+      retentionRate: stat.totalConverted > 0 ? (stat.totalRetained / stat.totalConverted) * 100 : 0,
+      classAverage: stat.totalNonEmptySessions > 0 ? stat.totalCustomers / stat.totalNonEmptySessions : 0,
+      avgLTV: stat.clientCount > 0 ? stat.totalLTV / stat.clientCount : 0,
+      emptyClassRate: stat.totalSessions > 0 ? (stat.totalEmptySessions / stat.totalSessions) * 100 : 0
+    })).filter(stat => stat.totalSessions > 0);
+  }, [data, payrollData]);
 
-  // Calculate membership stats
+  // Calculate membership stats from client data only
   const membershipStats = React.useMemo(() => {
     const stats = new Map();
     
@@ -173,8 +153,7 @@ export const ClientConversionSimplifiedRanks: React.FC<ClientConversionSimplifie
           newMembers: 0,
           converted: 0,
           retained: 0,
-          totalLTV: 0,
-          trialsCompleted: 0
+          totalLTV: 0
         });
       }
       
@@ -191,97 +170,33 @@ export const ClientConversionSimplifiedRanks: React.FC<ClientConversionSimplifie
       if (client.retentionStatus === 'Retained') {
         membershipStat.retained++;
       }
-      if ((client.visitsPostTrial || 0) > 0) {
-        membershipStat.trialsCompleted++;
-      }
     });
     
     return Array.from(stats.values()).map(stat => ({
       ...stat,
       conversionRate: stat.newMembers > 0 ? (stat.converted / stat.newMembers) * 100 : 0,
       retentionRate: stat.converted > 0 ? (stat.retained / stat.converted) * 100 : 0,
-      avgLTV: stat.totalClients > 0 ? stat.totalLTV / stat.totalClients : 0,
-      trialConversionRate: stat.trialsCompleted > 0 ? (stat.converted / stat.trialsCompleted) * 100 : 0
-    }));
+      avgLTV: stat.totalClients > 0 ? stat.totalLTV / stat.totalClients : 0
+    })).filter(stat => stat.totalClients > 0);
   }, [data]);
 
-  // Calculate hosted classes stats (by trainer and class combination)
-  const hostedClassStats = React.useMemo(() => {
-    const stats = new Map();
-    
-    data.forEach(client => {
-      const hostedClass = `${client.trainerName || 'Unknown'} - ${client.firstVisitEntityName || 'Unknown Class'}`;
-      if (!stats.has(hostedClass)) {
-        stats.set(hostedClass, {
-          name: hostedClass,
-          trainer: client.trainerName || 'Unknown',
-          className: client.firstVisitEntityName || 'Unknown Class',
-          totalClients: 0,
-          newMembers: 0,
-          converted: 0,
-          retained: 0,
-          totalLTV: 0,
-          trialsCompleted: 0
-        });
-      }
-      
-      const hostedStat = stats.get(hostedClass);
-      hostedStat.totalClients++;
-      hostedStat.totalLTV += client.ltv || 0;
-      
-      if (String(client.isNew || '').includes('New')) {
-        hostedStat.newMembers++;
-      }
-      if (client.conversionStatus === 'Converted') {
-        hostedStat.converted++;
-      }
-      if (client.retentionStatus === 'Retained') {
-        hostedStat.retained++;
-      }
-      if ((client.visitsPostTrial || 0) > 0) {
-        hostedStat.trialsCompleted++;
-      }
-    });
-    
-    return Array.from(stats.values()).map(stat => ({
-      ...stat,
-      conversionRate: stat.newMembers > 0 ? (stat.converted / stat.newMembers) * 100 : 0,
-      retentionRate: stat.converted > 0 ? (stat.retained / stat.converted) * 100 : 0,
-      avgLTV: stat.totalClients > 0 ? stat.totalLTV / stat.totalClients : 0,
-      trialConversionRate: stat.trialsCompleted > 0 ? (stat.converted / stat.trialsCompleted) * 100 : 0
-    }));
-  }, [data]);
-
+  // Simplified ranking options - only the most important metrics
   const rankingOptions = [
-    // Trainers
-    { id: 'trainer-conversion', label: 'Trainer Conversion', icon: Trophy, type: 'trainer', metric: 'conversionRate' },
-    { id: 'trainer-retention', label: 'Trainer Retention', icon: Target, type: 'trainer', metric: 'retentionRate' },
-    { id: 'trainer-ltv', label: 'Trainer LTV', icon: DollarSign, type: 'trainer', metric: 'avgLTV' },
-    { id: 'trainer-volume', label: 'Trainer Volume', icon: Users, type: 'trainer', metric: 'totalClients' },
+    // Trainer Rankings
+    { id: 'trainer-conversion', label: 'Trainer Conversion Rate', icon: Trophy, type: 'trainer', metric: 'conversionRate' },
+    { id: 'trainer-classes', label: 'Classes Taught', icon: Calendar, type: 'trainer', metric: 'totalSessions' },
+    { id: 'trainer-average', label: 'Class Average', icon: BarChart3, type: 'trainer', metric: 'classAverage' },
+    { id: 'trainer-empty', label: 'Empty Classes', icon: XCircle, type: 'trainer', metric: 'emptyClassRate' },
     
-    // Locations
-    { id: 'location-conversion', label: 'Location Conversion', icon: MapPin, type: 'location', metric: 'conversionRate' },
-    { id: 'location-retention', label: 'Location Retention', icon: Award, type: 'location', metric: 'retentionRate' },
-    { id: 'location-ltv', label: 'Location LTV', icon: TrendingUp, type: 'location', metric: 'avgLTV' },
-    { id: 'location-volume', label: 'Location Volume', icon: Users, type: 'location', metric: 'totalClients' },
+    // Location Rankings
+    { id: 'location-conversion', label: 'Location Conversion Rate', icon: MapPin, type: 'location', metric: 'conversionRate' },
+    { id: 'location-classes', label: 'Total Sessions', icon: Calendar, type: 'location', metric: 'totalSessions' },
+    { id: 'location-average', label: 'Class Average', icon: BarChart3, type: 'location', metric: 'classAverage' },
+    { id: 'location-empty', label: 'Empty Classes', icon: XCircle, type: 'location', metric: 'emptyClassRate' },
     
-    // Classes
-    { id: 'class-conversion', label: 'Class Conversion', icon: Calendar, type: 'class', metric: 'conversionRate' },
-    { id: 'class-retention', label: 'Class Retention', icon: Star, type: 'class', metric: 'retentionRate' },
-    { id: 'class-ltv', label: 'Class LTV', icon: DollarSign, type: 'class', metric: 'avgLTV' },
-    { id: 'class-volume', label: 'Class Volume', icon: Users, type: 'class', metric: 'totalClients' },
-    
-    // Memberships
-    { id: 'membership-conversion', label: 'Membership Conversion', icon: Award, type: 'membership', metric: 'conversionRate' },
-    { id: 'membership-retention', label: 'Membership Retention', icon: Target, type: 'membership', metric: 'retentionRate' },
-    { id: 'membership-ltv', label: 'Membership LTV', icon: DollarSign, type: 'membership', metric: 'avgLTV' },
-    { id: 'membership-volume', label: 'Membership Volume', icon: Users, type: 'membership', metric: 'totalClients' },
-    
-    // Hosted Classes
-    { id: 'hosted-conversion', label: 'Hosted Class Conversion', icon: Trophy, type: 'hosted', metric: 'conversionRate' },
-    { id: 'hosted-retention', label: 'Hosted Class Retention', icon: Target, type: 'hosted', metric: 'retentionRate' },
-    { id: 'hosted-ltv', label: 'Hosted Class LTV', icon: DollarSign, type: 'hosted', metric: 'avgLTV' },
-    { id: 'hosted-volume', label: 'Hosted Class Volume', icon: Users, type: 'hosted', metric: 'totalClients' }
+    // Membership Rankings
+    { id: 'membership-conversion', label: 'Membership Conversion', icon: Target, type: 'membership', metric: 'conversionRate' },
+    { id: 'membership-ltv', label: 'Membership LTV', icon: DollarSign, type: 'membership', metric: 'avgLTV' }
   ];
 
   const getCurrentData = () => {
@@ -296,40 +211,54 @@ export const ClientConversionSimplifiedRanks: React.FC<ClientConversionSimplifie
       case 'location':
         sourceData = locationStats;
         break;
-      case 'class':
-        sourceData = classStats;
-        break;
       case 'membership':
         sourceData = membershipStats;
-        break;
-      case 'hosted':
-        sourceData = hostedClassStats;
         break;
       default:
         sourceData = trainerStats;
     }
 
-    const minThreshold = option.type === 'hosted' ? 1 : (option.type === 'trainer' ? 3 : 1);
+    // Filter out entries with insufficient data
+    const minThreshold = option.type === 'membership' ? 5 : 3;
+    const filtered = sourceData.filter(item => {
+      if (option.type === 'membership') {
+        return item.totalClients >= minThreshold;
+      }
+      return (item.totalSessions || 0) >= minThreshold;
+    });
     
-    const filtered = sourceData.filter(item => 
-      option.metric === 'totalClients' ? item.totalClients >= 1 : item.newMembers >= minThreshold
-    );
-    
-    const sorted = [...filtered].sort((a, b) => b[option.metric] - a[option.metric]);
+    const sorted = [...filtered].sort((a, b) => {
+      // For empty class rate, we want ascending order (lower is better)
+      if (option.metric === 'emptyClassRate') {
+        return a[option.metric] - b[option.metric];
+      }
+      return b[option.metric] - a[option.metric];
+    });
     
     return {
       top: sorted.slice(0, 5),
-      bottom: sorted.slice(-5).reverse()
+      bottom: option.metric === 'emptyClassRate' ? sorted.slice(-5).reverse() : sorted.slice(-5).reverse()
     };
   };
+
+  if (payrollLoading) {
+    return <div className="flex items-center justify-center p-8">Loading payroll data...</div>;
+  }
 
   const { top, bottom } = getCurrentData();
   const currentOption = rankingOptions.find(r => r.id === selectedRanking);
 
   const formatValue = (value: number, metric: string) => {
     if (metric === 'avgLTV') return formatCurrency(value);
-    if (metric === 'totalClients') return formatNumber(value);
+    if (metric === 'totalSessions' || metric === 'classAverage') return value.toFixed(1);
     return `${value.toFixed(1)}%`;
+  };
+
+  const getSecondaryMetric = (item: any, type: string) => {
+    if (type === 'trainer' || type === 'location') {
+      return `${item.totalSessions || 0} sessions • ${(item.emptyClassRate || 0).toFixed(1)}% empty`;
+    }
+    return `${item.totalClients || 0} clients`;
   };
 
   const RankCard = ({ title, data: rankData, isTop = true }) => (
@@ -368,12 +297,11 @@ export const ClientConversionSimplifiedRanks: React.FC<ClientConversionSimplifie
                 {index + 1}
               </div>
               <div>
-                <p className="font-bold text-slate-900 truncate max-w-[140px]" title={item.name}>
+                <p className="font-bold text-slate-900 truncate max-w-[200px]" title={item.name}>
                   {item.name}
                 </p>
                 <p className="text-sm text-slate-500">
-                  {formatNumber(item.totalClients)} clients
-                  {item.trainer && <span className="block text-xs">by {item.trainer}</span>}
+                  {getSecondaryMetric(item, currentOption?.type || 'trainer')}
                 </p>
               </div>
             </div>
@@ -387,9 +315,11 @@ export const ClientConversionSimplifiedRanks: React.FC<ClientConversionSimplifie
               >
                 {formatValue(item[currentOption?.metric || 'conversionRate'], currentOption?.metric || 'conversionRate')}
               </Badge>
-              <p className="text-xs text-slate-500 mt-1">
-                {formatCurrency(item.avgLTV)} LTV
-              </p>
+              {(currentOption?.type === 'trainer' || currentOption?.type === 'location') && (
+                <p className="text-xs text-slate-500 mt-1">
+                  {item.classAverage?.toFixed(1)} avg
+                </p>
+              )}
             </div>
           </div>
         ))}
@@ -405,10 +335,13 @@ export const ClientConversionSimplifiedRanks: React.FC<ClientConversionSimplifie
           <CardTitle className="flex items-center gap-3 text-slate-800">
             <Trophy className="w-6 h-6 text-yellow-600" />
             Performance Rankings
+            <span className="text-sm font-normal text-slate-500 ml-2">
+              Based on New Client and Payroll data
+            </span>
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
             {rankingOptions.map((option) => (
               <Button
                 key={option.id}
@@ -434,13 +367,13 @@ export const ClientConversionSimplifiedRanks: React.FC<ClientConversionSimplifie
       {/* Top and Bottom Rankings */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <RankCard
-          title={`Top ${currentOption?.label || 'Performance'}`}
+          title={`Best ${currentOption?.label || 'Performance'}`}
           data={top}
           isTop={true}
         />
         
         <RankCard
-          title={`Bottom ${currentOption?.label || 'Performance'}`}
+          title={`${currentOption?.metric === 'emptyClassRate' ? 'Most' : 'Lowest'} ${currentOption?.label || 'Performance'}`}
           data={bottom}
           isTop={false}
         />
