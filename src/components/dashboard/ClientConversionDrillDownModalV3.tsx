@@ -6,7 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { formatCurrency, formatNumber } from '@/utils/formatters';
-import { TrendingUp, TrendingDown, Users, ShoppingCart, Calendar, MapPin, BarChart3, DollarSign, Activity, CreditCard, Target, Clock, Star, Zap, X, Trophy, Table as TableIcon } from 'lucide-react';
+import { TrendingUp, TrendingDown, Users, ShoppingCart, Calendar, MapPin, BarChart3, DollarSign, Activity, CreditCard, Target, Clock, Star, Zap, X, Trophy, Table as TableIcon, Crown } from 'lucide-react';
 import { NewClientData } from '@/types/dashboard';
 interface ClientConversionDrillDownModalV3Props {
   isOpen: boolean;
@@ -78,7 +78,7 @@ export const ClientConversionDrillDownModalV3: React.FC<ClientConversionDrillDow
     };
   }, [clients]);
   const renderMetricCards = () => {
-    return <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+    return <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
         <Card className="bg-gradient-to-br from-blue-500 to-blue-600 text-white border-0 shadow-lg">
           <CardContent className="p-4">
             <div className="flex items-center justify-between mb-2">
@@ -98,6 +98,17 @@ export const ClientConversionDrillDownModalV3: React.FC<ClientConversionDrillDow
             </div>
             <div className="text-2xl font-bold">{formatNumber(summary.newMembers)}</div>
             <div className="text-green-100 text-sm">New Members</div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-gradient-to-br from-emerald-500 to-emerald-600 text-white border-0 shadow-lg">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between mb-2">
+              <Crown className="w-5 h-5 text-emerald-100" />
+              <Badge className="bg-white/20 text-white border-0">Conv</Badge>
+            </div>
+            <div className="text-2xl font-bold">{formatNumber(summary.convertedMembers)}</div>
+            <div className="text-emerald-100 text-sm">Converted</div>
           </CardContent>
         </Card>
 

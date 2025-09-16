@@ -597,10 +597,33 @@ export const ClientConversionSimplifiedRanks: React.FC<ClientConversionSimplifie
   };
 
   const getSecondaryMetric = (item: any, type: string) => {
+    const currentMetric = currentOption?.metric;
+    
+    // For conversion rate rankings, show new members and converted members
+    if (currentMetric === 'conversionRate') {
+      return `${item.totalNew || 0} new • ${item.totalConverted || 0} converted`;
+    }
+    
     if (type === 'trainer' || type === 'location') {
       return `${item.totalSessions || 0} sessions • ${(item.emptyClassRate || 0).toFixed(1)}% empty`;
     }
     return `${item.totalClients || 0} clients`;
+  };
+
+  const getMainMetrics = (item: any, metric: string) => {
+    // For conversion rankings, return multiple metrics to display
+    if (metric === 'conversionRate') {
+      return [
+        { label: 'Conversion Rate', value: `${(item.conversionRate || 0).toFixed(1)}%`, color: 'emerald' },
+        { label: 'New Members', value: formatNumber(item.totalNew || 0), color: 'blue' },
+        { label: 'Converted', value: formatNumber(item.totalConverted || 0), color: 'green' }
+      ];
+    }
+    
+    // For other metrics, return single metric
+    return [
+      { label: currentOption?.label || '', value: formatValue(item[metric] || 0, metric), color: 'emerald' }
+    ];
   };
 
   const RankCard = ({ title, data: rankData, isTop = true }) => (
@@ -656,55 +679,107 @@ export const ClientConversionSimplifiedRanks: React.FC<ClientConversionSimplifie
                 </p>
               </div>
             </div>
-            <div className="text-right flex items-center gap-2">
-              <div>
-                <div className="flex items-center gap-2">
-                  <Badge 
-                    className={`font-bold text-sm px-3 py-1 ${
-                      isTop 
-                        ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' 
-                        : 'bg-orange-100 text-orange-800 border border-orange-200'
-                    }`}
-                  >
-                    {formatValue(item[currentOption?.metric || 'conversionRate'], currentOption?.metric || 'conversionRate')}
-                  </Badge>
-                  {/* Growth Indicator */}
-                  {(() => {
-                    const getGrowthMetric = () => {
-                      if (currentOption?.metric === 'conversionRate') return item.conversionGrowth;
-                      if (currentOption?.metric === 'classAverage') return item.classAverageGrowth;
-                      if (currentOption?.metric === 'totalSessions') return item.sessionsGrowth;
-                      if (currentOption?.metric === 'emptyClassRate') return item.emptyClassRateGrowth;
-                      if (currentOption?.metric === 'totalCustomers') return item.customersGrowth;
-                      if (currentOption?.metric === 'totalClients') return item.clientsGrowth;
-                      if (currentOption?.metric === 'avgLTV') return item.ltvGrowth;
-                      return 0;
-                    };
-                    
-                    const growth = getGrowthMetric();
-                    if (growth && Math.abs(growth) > 0.1) {
-                      return (
-                        <div className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
-                          growth > 0 
-                            ? 'bg-green-100 text-green-700' 
-                            : 'bg-red-100 text-red-700'
-                        }`}>
-                          {growth > 0 ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
-                          {Math.abs(growth).toFixed(1)}%
-                        </div>
-                      );
-                    }
-                    return null;
-                  })()}
-                </div>
-                {(currentOption?.type === 'trainer' || currentOption?.type === 'location') && (
-                  <p className="text-xs text-slate-500 mt-1">
-                    {item.classAverage?.toFixed(1)} avg
-                  </p>
-                )}
-              </div>
-              <Eye className="w-4 h-4 text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+            <div className="text-right flex items-center gap-3">
+              {/* Multiple metrics display for conversion rankings */}
+              {(() => {
+                const metrics = getMainMetrics(item, currentOption?.metric || 'conversionRate');
+                
+                if (metrics.length > 1) {
+                  // Modern layout for conversion metrics (similar to sales tab)
+                  return (
+                    <div className="flex flex-col gap-2">
+                      <div className="flex items-center gap-3">
+                        {metrics.map((metric, idx) => (
+                          <div key={idx} className="text-center">
+                            <div className={`font-bold text-lg ${
+                              metric.color === 'emerald' ? 'text-emerald-700' :
+                              metric.color === 'blue' ? 'text-blue-700' :
+                              metric.color === 'green' ? 'text-green-700' : 'text-slate-700'
+                            }`}>
+                              {metric.value}
+                            </div>
+                            <div className="text-xs text-slate-500 font-medium">
+                              {metric.label}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                      
+                      {/* Growth Indicator */}
+                      {(() => {
+                        const growth = item.conversionGrowth;
+                        if (growth && Math.abs(growth) > 0.1) {
+                          return (
+                            <div className={`flex items-center justify-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
+                              growth > 0 
+                                ? 'bg-green-100 text-green-700' 
+                                : 'bg-red-100 text-red-700'
+                            }`}>
+                              {growth > 0 ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
+                              {Math.abs(growth).toFixed(1)}%
+                            </div>
+                          );
+                        }
+                        return null;
+                      })()}
+                    </div>
+                  );
+                }
+                
+                // Single metric display for other rankings
+                return (
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <Badge 
+                        className={`font-bold text-sm px-3 py-1 ${
+                          isTop 
+                            ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' 
+                            : 'bg-orange-100 text-orange-800 border border-orange-200'
+                        }`}
+                      >
+                        {metrics[0].value}
+                      </Badge>
+                      {/* Growth Indicator */}
+                      {(() => {
+                        const getGrowthMetric = () => {
+                          if (currentOption?.metric === 'conversionRate') return item.conversionGrowth;
+                          if (currentOption?.metric === 'classAverage') return item.classAverageGrowth;
+                          if (currentOption?.metric === 'totalSessions') return item.sessionsGrowth;
+                          if (currentOption?.metric === 'emptyClassRate') return item.emptyClassRateGrowth;
+                          if (currentOption?.metric === 'totalCustomers') return item.customersGrowth;
+                          if (currentOption?.metric === 'totalClients') return item.clientsGrowth;
+                          if (currentOption?.metric === 'avgLTV') return item.ltvGrowth;
+                          return 0;
+                        };
+                        
+                        const growth = getGrowthMetric();
+                        if (growth && Math.abs(growth) > 0.1) {
+                          return (
+                            <div className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
+                              growth > 0 
+                                ? 'bg-green-100 text-green-700' 
+                                : 'bg-red-100 text-red-700'
+                            }`}>
+                              {growth > 0 ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
+                              {Math.abs(growth).toFixed(1)}%
+                            </div>
+                          );
+                        }
+                        return null;
+                      })()}
+                    </div>
+                  </div>
+                );
+              })()}
+              
+              {/* Additional details for trainers/locations */}
+              {(currentOption?.type === 'trainer' || currentOption?.type === 'location') && (
+                <p className="text-xs text-slate-500 mt-1">
+                  {item.classAverage?.toFixed(1)} avg
+                </p>
+              )}
             </div>
+            <Eye className="w-4 h-4 text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity" />
           </div>
         ))}
         
