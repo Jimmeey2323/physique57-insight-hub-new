@@ -58,9 +58,9 @@ const ClientRetention = () => {
 
   // Filters state
   const [filters, setFilters] = useState<NewClientFilterOptions>(() => {
-    const previousMonth = getPreviousMonthDateRange();
+    // Start with no date filter to show all data by default
     return {
-      dateRange: previousMonth,
+      dateRange: { start: '', end: '' },
       location: [],
       homeLocation: [],
       trainer: [],
@@ -182,6 +182,7 @@ const ClientRetention = () => {
   // Filter data by selected location and filters
   const filteredData = React.useMemo(() => {
     console.log('Filtering data. Total records:', data.length, 'Selected location:', selectedLocation);
+    console.log('Current filters:', filters);
     let filtered = data;
 
     // TEMPORARY: Show sample of raw data for debugging
@@ -193,7 +194,7 @@ const ClientRetention = () => {
       });
     }
 
-    // Apply date range filter FIRST - but make it more lenient for debugging
+    // Apply date range filter FIRST - only if both start and end dates are provided
     if (filters.dateRange.start && filters.dateRange.end) {
       const startDate = filters.dateRange.start ? new Date(filters.dateRange.start + 'T00:00:00') : null;
       const endDate = filters.dateRange.end ? new Date(filters.dateRange.end + 'T23:59:59') : null;
@@ -291,7 +292,24 @@ const ClientRetention = () => {
     if (filters.maxLTV !== undefined) {
       filtered = filtered.filter(client => (client.ltv || 0) <= filters.maxLTV!);
     }
-    console.log('Filtered data:', filtered.length, 'records');
+    console.log('Final filtered data for metric cards:', filtered.length, 'records');
+    
+    // Log sample of final filtered data for debugging
+    if (filtered.length > 0) {
+      console.log('Sample filtered data:', {
+        count: filtered.length,
+        firstFew: filtered.slice(0, 2).map(c => ({
+          memberId: c.memberId,
+          isNew: c.isNew,
+          conversionStatus: c.conversionStatus,
+          retentionStatus: c.retentionStatus,
+          ltv: c.ltv
+        }))
+      });
+    } else {
+      console.warn('No data remaining after filtering!');
+    }
+    
     return filtered;
   }, [data, selectedLocation, filters]);
 
